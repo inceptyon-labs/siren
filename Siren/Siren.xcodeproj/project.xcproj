@@ -204,6 +204,8 @@
             "    ",
             "    IOS_PLIST=\"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\"",
             "    /usr/libexec/PlistBuddy -c \"Set :CFBundleVersion $TIMESTAMP\" \"$IOS_PLIST\"",
+            "    # SIREN: Xcode sets CFBundleName to PRODUCT_NAME, and \"Siren\" is taken on the App Store (ITMS-90129)",
+            "    /usr/libexec/PlistBuddy -c \"Set :CFBundleName Siren Books\" \"$IOS_PLIST\"",
             "    echo \"Updated iOS build number to: $TIMESTAMP\"",
             "    ",
             "    WATCH_PLIST=\"${TARGET_BUILD_DIR}/${PRODUCT_NAME}.app/Watch/${PRODUCT_NAME} Watch App.app/Info.plist\"",

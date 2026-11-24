@@ -9,8 +9,6 @@
 	</array>
 	<key>CFBundleDisplayName</key>
 	<string>Siren Books</string>
-	<key>CFBundleName</key>
-	<string>Siren Books</string>
 	<key>CFBundleGetInfoString</key>
 	<string></string>
 	<key>CFBundleURLTypes</key>
