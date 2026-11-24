@@ -31,7 +31,7 @@ final class AlarmNotificationService {
     let interval = max(1, triggerDate.timeIntervalSinceNow)
     let content = UNMutableNotificationContent()
     content.title = String(localized: "Alarm")
-    content.body = String(localized: "Siren alarm") // SIREN: Siren name
+    content.body = String(localized: "Siren alarm")  // SIREN: Siren name
     content.sound = UNNotificationSound(
       named: UNNotificationSoundName(rawValue: soundFileName)
     )

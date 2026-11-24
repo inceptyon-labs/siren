@@ -74,7 +74,8 @@ struct SirenLibraryView: View {
       Label(
         "Sort and filter",
         systemImage: shelfFilter == .all
-          ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+          ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill"
+      )
     }
   }
 
@@ -98,7 +99,8 @@ private struct SirenLibraryCell: View {
   let book: DemoBook
 
   var body: some View {
-    Button {} label: {
+    Button {
+    } label: {
       VStack(alignment: .leading, spacing: 8) {
         RevealCover(book: book)
         VStack(alignment: .leading, spacing: 2) {

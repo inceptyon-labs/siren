@@ -17,7 +17,7 @@ final class StorageManager {
   nonisolated private static func downloadedContentSize() -> Int64 {
     guard
       let appGroupURL = FileManager.default.containerURL(
-        forSecurityApplicationGroupIdentifier: "group.com.inceptyon.siren" // SIREN: Siren identifiers
+        forSecurityApplicationGroupIdentifier: "group.com.inceptyon.siren"  // SIREN: Siren identifiers
       )
     else {
       return 0

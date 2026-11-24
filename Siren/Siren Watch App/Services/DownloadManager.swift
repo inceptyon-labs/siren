@@ -26,8 +26,8 @@ final class DownloadManager: NSObject, ObservableObject {
     }
   }
 
-  private static let sessionIdentifier = "com.inceptyon.siren.watch.downloads" // SIREN: Siren identifiers
-  private static let legacySessionPrefix = "com.inceptyon.siren.watch.download." // SIREN: Siren identifiers
+  private static let sessionIdentifier = "com.inceptyon.siren.watch.downloads"  // SIREN: Siren identifiers
+  private static let legacySessionPrefix = "com.inceptyon.siren.watch.download."  // SIREN: Siren identifiers
   private static let migrationKey = "downloads_migrated_to_shared_session"
   private static let autoResumeInterval: TimeInterval = 300
   private static let freshPayloadInterval: TimeInterval = 600

@@ -7,7 +7,7 @@ let package = Package(
   platforms: [
     .iOS(.v17),
     .watchOS(.v10),
-    .tvOS(.v17), // SIREN: tvOS for the Apple TV app
+    .tvOS(.v17),  // SIREN: tvOS for the Apple TV app
   ],
   products: [
     .library(

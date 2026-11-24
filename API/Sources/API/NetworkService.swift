@@ -144,7 +144,7 @@ final class NetworkService: @unchecked Sendable {
 
     let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
 
-    return "Siren/\(appVersion) (\(platform))" // SIREN: Siren name
+    return "Siren/\(appVersion) (\(platform))"  // SIREN: Siren name
   }()
 
   private let decoder: JSONDecoder = {

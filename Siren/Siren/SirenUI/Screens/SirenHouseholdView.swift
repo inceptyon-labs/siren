@@ -7,7 +7,11 @@ struct SirenHouseholdView: View {
     List {
       Section("Listening now") {
         memberRow(
-          Demo.sarah, book: Demo.glassOrchard, detail: "41% · Ch 11 · listening now", live: true)
+          Demo.sarah,
+          book: Demo.glassOrchard,
+          detail: "41% · Ch 11 · listening now",
+          live: true
+        )
         memberRow(Demo.kids, book: nil, detail: "Last listened Saturday", live: false)
       }
 
@@ -37,7 +41,8 @@ struct SirenHouseholdView: View {
     .navigationTitle("Household")
     .toolbar {
       ToolbarItem(placement: .topBarTrailing) {
-        Button {} label: {
+        Button {
+        } label: {
           Image(systemName: "person.badge.plus")
         }
         .accessibilityLabel("Add household member")

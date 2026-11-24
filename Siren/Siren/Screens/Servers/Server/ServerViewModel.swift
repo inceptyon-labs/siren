@@ -472,7 +472,7 @@ final class ServerViewModel: ServerView.Model {
     selectedLibrary = nil
 
     if let appGroupURL = FileManager.default.containerURL(
-      forSecurityApplicationGroupIdentifier: "group.com.inceptyon.siren" // SIREN: Siren identifiers
+      forSecurityApplicationGroupIdentifier: "group.com.inceptyon.siren"  // SIREN: Siren identifiers
     ) {
       let serverDirectory = appGroupURL.appendingPathComponent(serverID)
 

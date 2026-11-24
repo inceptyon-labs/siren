@@ -39,7 +39,7 @@ struct OnboardingView: View {
         .clipShape(.rect(cornerRadius: 22, style: .continuous))
         .accessibilityHidden(true)
 
-      Text("Welcome to Siren") // SIREN: Siren name
+      Text("Welcome to Siren")  // SIREN: Siren name
         .font(.largeTitle)
         .fontWeight(.bold)
         .multilineTextAlignment(.center)

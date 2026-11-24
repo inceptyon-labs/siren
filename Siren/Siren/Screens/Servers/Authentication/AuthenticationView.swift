@@ -122,7 +122,7 @@ struct AuthenticationView: View {
           }
           .disabled(model.isLoading)
         } footer: {
-          Text("Add **siren://oauth** to audiobookshelf server redirect URIs") // SIREN: Siren identifiers
+          Text("Add **siren://oauth** to audiobookshelf server redirect URIs")  // SIREN: Siren identifiers
             .textSelection(.enabled)
             .font(.footnote)
         }

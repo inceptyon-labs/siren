@@ -16,7 +16,7 @@ final class SleepTimerActivityCleanup {
 
   static let shared = SleepTimerActivityCleanup()
 
-  private let taskIdentifier = "com.inceptyon.siren.dismiss-sleep-timer-activity" // SIREN: Siren identifiers
+  private let taskIdentifier = "com.inceptyon.siren.dismiss-sleep-timer-activity"  // SIREN: Siren identifiers
 
   private init() {
     registerBackgroundTask()

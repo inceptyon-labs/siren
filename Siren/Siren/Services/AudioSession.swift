@@ -3,7 +3,8 @@ import Foundation
 import Logging
 
 nonisolated enum AudioSession {
-  private static let queue = DispatchQueue(label: "com.inceptyon.siren.AudioSession", qos: .userInitiated) // SIREN: Siren identifiers
+  // SIREN: Siren identifiers
+  private static let queue = DispatchQueue(label: "com.inceptyon.siren.AudioSession", qos: .userInitiated)
 
   @MainActor
   @discardableResult

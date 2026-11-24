@@ -127,7 +127,8 @@ struct SirenCarModeView: View {
   }
 
   private func tile(_ symbol: String, label: LocalizedStringKey) -> some View {
-    Button {} label: {
+    Button {
+    } label: {
       Image(systemName: symbol)
         .font(.system(size: min(glyph, 56), weight: .semibold))
         .foregroundStyle(SirenTheme.ink)

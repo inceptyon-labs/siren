@@ -3,7 +3,8 @@ import SwiftUI
 
 extension Color {
   static var widgetAccent: Color {
-    guard let raw = UserDefaults(suiteName: "group.com.inceptyon.siren")?.string(forKey: "accentColor"), // SIREN: Siren identifiers
+    // SIREN: Siren identifiers
+    guard let raw = UserDefaults(suiteName: "group.com.inceptyon.siren")?.string(forKey: "accentColor"),
       let color = Color(rawValue: raw)
     else {
       return .accentColor

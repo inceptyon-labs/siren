@@ -122,7 +122,8 @@ struct SirenProgressArtSettingsView: View {
   /// Same corner, hairline and shadow as RevealCover, for the two non-cover previews.
   private func thumbnail<Content: View>(_ content: Content) -> some View {
     let shape = RoundedRectangle(cornerRadius: SirenTheme.coverRadius, style: .continuous)
-    return content
+    return
+      content
       .frame(width: 56, height: 56)
       .clipShape(shape)
       .overlay { shape.strokeBorder(.black.opacity(0.08), lineWidth: 0.5) }
@@ -165,7 +166,8 @@ private struct SirenVoicePrintThumbnail: View {
         context.stroke(
           line,
           with: .color(index < 5 ? Color.white : Color.white.opacity(0.3)),
-          style: StrokeStyle(lineWidth: 1, lineJoin: .round))
+          style: StrokeStyle(lineWidth: 1, lineJoin: .round)
+        )
       }
     }
   }

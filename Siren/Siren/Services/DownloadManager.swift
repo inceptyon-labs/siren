@@ -12,9 +12,9 @@ import UIKit
 final class DownloadManager: NSObject, ObservableObject {
   static let shared = DownloadManager()
 
-  nonisolated static let appGroupIdentifier = "group.com.inceptyon.siren" // SIREN: Siren identifiers
+  nonisolated static let appGroupIdentifier = "group.com.inceptyon.siren"  // SIREN: Siren identifiers
 
-  nonisolated static let sessionIdentifier = "com.inceptyon.siren.download" // SIREN: Siren identifiers
+  nonisolated static let sessionIdentifier = "com.inceptyon.siren.download"  // SIREN: Siren identifiers
 
   nonisolated static let appGroupContainer: URL = {
     guard let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier) else {

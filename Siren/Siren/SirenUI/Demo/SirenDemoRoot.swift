@@ -61,9 +61,14 @@ struct SirenDemoRoot: View {
       .tint(SirenTheme.tint)
       .onAppear(perform: route)
       .sheet(isPresented: $showPlayer) {
-        SirenPlayerView(art: $playerArt, onCarMode: { showPlayer = false; showCar = true })
-          .presentationDragIndicator(.visible)
-          .sirenPageSizing()
+        SirenPlayerView(
+          art: $playerArt,
+          onCarMode: {
+            showPlayer = false; showCar = true
+          }
+        )
+        .presentationDragIndicator(.visible)
+        .sirenPageSizing()
       }
       .sheet(isPresented: $showSend) {
         SirenSendSheet(book: Demo.saltRoad)
@@ -172,13 +177,15 @@ struct SirenMiniPlayer: View {
           .monospacedDigit()
       }
       Spacer(minLength: 8)
-      Button {} label: {
+      Button {
+      } label: {
         Image(systemName: "pause.fill").font(.title3)
       }
       .buttonStyle(.plain)
       .frame(width: 44, height: 44)
       .accessibilityLabel("Pause")
-      Button {} label: {
+      Button {
+      } label: {
         Image(systemName: "goforward.30").font(.title3)
       }
       .buttonStyle(.plain)

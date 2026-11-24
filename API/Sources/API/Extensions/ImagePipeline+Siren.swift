@@ -2,7 +2,8 @@ import Foundation
 import Nuke
 
 extension ImagePipeline {
-  nonisolated private static let dataCache = try? DataCache(name: "com.inceptyon.siren.images") // SIREN: Siren identifiers
+  // SIREN: Siren identifiers
+  nonisolated private static let dataCache = try? DataCache(name: "com.inceptyon.siren.images")
 
   nonisolated static func siren(customHeaders: [String: String]?) -> ImagePipeline {
     ImagePipeline {

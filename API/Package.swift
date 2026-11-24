@@ -4,7 +4,7 @@ import PackageDescription
 
 let package = Package(
   name: "API",
-  platforms: [.iOS(.v17), .watchOS(.v10), .tvOS(.v17)], // SIREN: tvOS for the Apple TV app
+  platforms: [.iOS(.v17), .watchOS(.v10), .tvOS(.v17)],  // SIREN: tvOS for the Apple TV app
   products: [
     .library(
       name: "API",

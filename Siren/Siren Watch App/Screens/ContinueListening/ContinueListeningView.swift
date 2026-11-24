@@ -14,7 +14,7 @@ struct ContinueListeningView: View {
         content
       }
     }
-    .navigationTitle("Siren") // SIREN: Siren name
+    .navigationTitle("Siren")  // SIREN: Siren name
     .navigationDestination(for: WatchHomeSection.self) { section in
       SectionDetailView(model: SectionDetailViewModel(section: section))
     }

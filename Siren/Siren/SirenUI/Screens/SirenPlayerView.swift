@@ -39,40 +39,40 @@ struct SirenPlayerView: View {
   }
 
   private var controls: some View {
-      VStack(spacing: 0) {
+    VStack(spacing: 0) {
 
-        VStack(alignment: .leading, spacing: 4) {
-          HStack(alignment: .firstTextBaseline) {
-            Text(book.title)
-              .font(SirenType.bookTitle(.title))
-              .foregroundStyle(SirenTheme.ink)
-            Spacer()
-            moreMenu
-          }
-          Text("\(book.author) · read by \(book.narrator)")
-            .font(.subheadline)
-            .foregroundStyle(SirenTheme.secondary)
-          Text("Ch \(book.currentChapter) · \(book.chapterTitle)")
-            .font(.subheadline.weight(.semibold))
+      VStack(alignment: .leading, spacing: 4) {
+        HStack(alignment: .firstTextBaseline) {
+          Text(book.title)
+            .font(SirenType.bookTitle(.title))
             .foregroundStyle(SirenTheme.ink)
-            .padding(.top, 2)
+          Spacer()
+          moreMenu
         }
+        Text("\(book.author) · read by \(book.narrator)")
+          .font(.subheadline)
+          .foregroundStyle(SirenTheme.secondary)
+        Text("Ch \(book.currentChapter) · \(book.chapterTitle)")
+          .font(.subheadline.weight(.semibold))
+          .foregroundStyle(SirenTheme.ink)
+          .padding(.top, 2)
+      }
+      .padding(.horizontal, 24)
+      .padding(.top, 18)
+
+      scrubber
         .padding(.horizontal, 24)
+        .padding(.top, 14)
+
+      transport
         .padding(.top, 18)
 
-        scrubber
-          .padding(.horizontal, 24)
-          .padding(.top, 14)
+      Spacer(minLength: 12)
 
-        transport
-          .padding(.top, 18)
-
-        Spacer(minLength: 12)
-
-        utilityRow
-          .padding(.horizontal, 20)
-          .padding(.bottom, 8)
-      }
+      utilityRow
+        .padding(.horizontal, 20)
+        .padding(.bottom, 8)
+    }
   }
 
   private func artArea(side: CGFloat) -> some View {
@@ -143,7 +143,8 @@ struct SirenPlayerView: View {
     HStack(spacing: 0) {
       transportButton("backward.end.fill", label: "Previous chapter", size: .title2)
       transportButton("gobackward.30", label: "Back 30 seconds", size: .largeTitle)
-      Button {} label: {
+      Button {
+      } label: {
         Image(systemName: "pause.fill")
           .font(.system(size: 30, weight: .bold))
           .foregroundStyle(SirenTheme.onTint)
@@ -160,7 +161,8 @@ struct SirenPlayerView: View {
   }
 
   private func transportButton(_ symbol: String, label: String, size: Font) -> some View {
-    Button {} label: {
+    Button {
+    } label: {
       Image(systemName: symbol)
         .font(size.weight(.regular))
         .frame(width: 56, height: 56)
@@ -174,12 +176,14 @@ struct SirenPlayerView: View {
 
   private var utilityRow: some View {
     HStack {
-      Button {} label: {
+      Button {
+      } label: {
         Text("1.3×").font(.headline).monospacedDigit()
       }
       .accessibilityLabel("Speed 1.3 times")
       Spacer()
-      Button {} label: {
+      Button {
+      } label: {
         Label("30 min", systemImage: "moon.zzz").font(.subheadline.weight(.semibold))
       }
       .accessibilityLabel("Sleep timer, 30 minutes")
@@ -195,7 +199,8 @@ struct SirenPlayerView: View {
   }
 
   private func utility(_ symbol: String, _ label: String) -> some View {
-    Button {} label: {
+    Button {
+    } label: {
       Image(systemName: symbol)
         .font(.title3)
         .frame(width: 44, height: 44)
@@ -255,14 +260,16 @@ struct VoicePrintView: View {
             let y = baseline - CGFloat(env[index]) * peak
             ctx.fill(
               Path(ellipseIn: CGRect(x: head - 4, y: y - 4, width: 8, height: 8)),
-              with: .color(SirenTheme.tint))
+              with: .color(SirenTheme.tint)
+            )
           } else {
             ctx.stroke(line, with: .color(faint.opacity(0.35)), style: StrokeStyle(lineWidth: 1, dash: [1, 2.5]))
           }
 
           if number % 5 == 0 {
             let label = ctx.resolve(
-              Text("\(number)").font(.system(size: 9, weight: .medium)).foregroundColor(faint.opacity(0.8)))
+              Text("\(number)").font(.system(size: 9, weight: .medium)).foregroundColor(faint.opacity(0.8))
+            )
             ctx.draw(label, at: CGPoint(x: 14, y: baseline - 3), anchor: .center)
           }
         }
@@ -279,7 +286,9 @@ struct VoicePrintView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
     .accessibilityElement(children: .ignore)
-    .accessibilityLabel("Voice print of \(book.title): \(book.currentChapter - 1) of \(book.chapterCount) chapters heard")
+    .accessibilityLabel(
+      "Voice print of \(book.title): \(book.currentChapter - 1) of \(book.chapterCount) chapters heard"
+    )
   }
 
   /// Speech-shaped loudness: a quiet opening, phrases separated by pauses, louder scenes.
@@ -304,7 +313,8 @@ struct VoicePrintView: View {
       raw[j] *= Double(samples - j) / Double(samples - fadeStart)
     }
     return raw.indices.map { j in
-      let lo = max(0, j - 2), hi = min(samples - 1, j + 2)
+      let lo = max(0, j - 2)
+      let hi = min(samples - 1, j + 2)
       return raw[lo...hi].reduce(0, +) / Double(hi - lo + 1)
     }
   }

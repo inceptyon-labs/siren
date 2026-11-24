@@ -369,7 +369,8 @@ final class BookPlayerModel: PlayerView.Model {
 
   func playOnPhone() {
     guard connectivityManager.isReachable else {
-      errorMessage = String(localized: "iPhone not reachable.\nOpen Siren on your iPhone and try again.") // SIREN: Siren name
+      // SIREN: Siren name
+      errorMessage = String(localized: "iPhone not reachable.\nOpen Siren on your iPhone and try again.")
       return
     }
 

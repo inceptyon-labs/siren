@@ -10,7 +10,7 @@ struct SirenWatchWidget: Widget {
       WatchComplicationView(entry: entry)
         .containerBackground(.clear, for: .widget)
     }
-    .configurationDisplayName("Siren") // SIREN: Siren name
+    .configurationDisplayName("Siren")  // SIREN: Siren name
     .description("Shows your current audiobook progress")
     .supportedFamilies([.accessoryCircular, .accessoryRectangular, .accessoryCorner])
   }
@@ -46,7 +46,7 @@ struct CornerComplicationView: View {
             Text(title)
           }
         } else {
-          Text("Siren") // SIREN: Siren name
+          Text("Siren")  // SIREN: Siren name
         }
       }
   }

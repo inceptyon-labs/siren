@@ -67,7 +67,9 @@ struct SirenHomeView: View {
 
   private var continueBlock: some View {
     HStack(alignment: .top, spacing: 16) {
-      Button { onOpenBook(current) } label: {
+      Button {
+        onOpenBook(current)
+      } label: {
         RevealCover(book: current, showTicks: true)
           .frame(width: 150, height: 150)
       }

@@ -67,7 +67,7 @@ final class ListeningStatsCardModel: ListeningStatsCard.Model {
       daysInARow: daysInARow
     )
 
-    if let sharedDefaults = UserDefaults(suiteName: "group.com.inceptyon.siren"), // SIREN: Siren identifiers
+    if let sharedDefaults = UserDefaults(suiteName: "group.com.inceptyon.siren"),  // SIREN: Siren identifiers
       let encoded = try? JSONEncoder().encode(data)
     {
       sharedDefaults.set(encoded, forKey: "listeningStats")

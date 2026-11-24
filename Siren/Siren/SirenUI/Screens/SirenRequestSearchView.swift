@@ -61,19 +61,25 @@ struct SirenRequestSearchView: View {
           description: Text(
             scope == .request
               ? "Search the Audible catalog. Books you don't have can be requested."
-              : "Search your library by title, author or narrator.")
+              : "Search your library by title, author or narrator."
+          )
         )
       }
     }
     .navigationTitle("Search")
     .navigationBarTitleDisplayMode(.large)
-    .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Title, author or narrator")
+    .searchable(
+      text: $query,
+      placement: .navigationBarDrawer(displayMode: .always),
+      prompt: "Title, author or narrator"
+    )
   }
 
   // MARK: Rows
 
   private func resultRow(_ book: DemoBook) -> some View {
-    let layout = dynamicTypeSize.isAccessibilitySize
+    let layout =
+      dynamicTypeSize.isAccessibilitySize
       ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
       : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
     return layout {

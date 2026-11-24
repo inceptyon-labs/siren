@@ -98,13 +98,15 @@ struct SirenBookDetailView: View {
           }
           .buttonStyle(BookDetailCapsuleStyle(kind: .wash))
 
-          Button {} label: {
+          Button {
+          } label: {
             Image(systemName: "arrow.down.circle")
           }
           .buttonStyle(BookDetailCapsuleStyle(kind: .wash))
           .accessibilityLabel("Download")
 
-          Button {} label: {
+          Button {
+          } label: {
             Image(systemName: "bookmark")
           }
           .buttonStyle(BookDetailCapsuleStyle(kind: .wash))

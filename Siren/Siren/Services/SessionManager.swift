@@ -16,7 +16,7 @@ import ActivityKit
 final class SessionManager {
   static let shared = SessionManager()
 
-  private let taskIdentifier = "com.inceptyon.siren.close-session" // SIREN: Siren identifiers
+  private let taskIdentifier = "com.inceptyon.siren.close-session"  // SIREN: Siren identifiers
   private let sessionIDKey = "activeSessionID"
   private let retryCountKey = "sessionCloseRetryCount"
   private let inactivityTimeout: TimeInterval = 10 * 60
@@ -697,7 +697,7 @@ extension SessionSync {
       updatedAt: Int(session.updatedAt.timeIntervalSince1970 * 1000),
       deviceInfo: SessionSync.DeviceInfo(
         deviceID: SessionService.deviceID,
-        clientName: "Siren iOS", // SIREN: Siren name
+        clientName: "Siren iOS",  // SIREN: Siren name
         model: Device.model
       )
     )

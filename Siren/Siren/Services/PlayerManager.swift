@@ -34,7 +34,7 @@ final class PlayerManager: ObservableObject, Sendable {
 
   private static let currentIDKey = "currentBookID"
   private static let queueKey = "playerQueue"
-  private let sharedDefaults = UserDefaults(suiteName: "group.com.inceptyon.siren") // SIREN: Siren identifiers
+  private let sharedDefaults = UserDefaults(suiteName: "group.com.inceptyon.siren")  // SIREN: Siren identifiers
 
   private var cancellables = Set<AnyCancellable>()
   private var serverID: String?

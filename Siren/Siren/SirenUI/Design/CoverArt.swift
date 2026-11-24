@@ -10,13 +10,62 @@ enum CoverLayout: Hashable { case saltRoad, sunSea, mountains, tree, moonHills, 
 struct CoverPalette: Hashable {
   let sky: UInt32, sun: UInt32, mid: UInt32, deep: UInt32, title: UInt32, byline: UInt32
 
-  static let slateSea = CoverPalette(sky: 0xC9D6DF, sun: 0xF2B33D, mid: 0x3B5B73, deep: 0x22384A, title: 0x1E2C38, byline: 0x3B5B73)
-  static let midnight = CoverPalette(sky: 0x1D2A44, sun: 0xF4C95D, mid: 0x3C5A8C, deep: 0x0F1830, title: 0xF4EEDD, byline: 0xF4C95D)
-  static let orchard = CoverPalette(sky: 0xF1E3C4, sun: 0xC8402B, mid: 0x4F7A4A, deep: 0x8B6A3E, title: 0x3A2A1A, byline: 0x8B6A3E)
-  static let ember = CoverPalette(sky: 0x1E1A1A, sun: 0xE4572E, mid: 0x6B2A1F, deep: 0x3A1712, title: 0xF2E6D8, byline: 0xF2A33A)
-  static let dusk = CoverPalette(sky: 0x2E2440, sun: 0xF1D9A0, mid: 0x5B3F6B, deep: 0x8E5A7A, title: 0xF1D9A0, byline: 0xE8B9C6)
-  static let rose = CoverPalette(sky: 0xF3D5CF, sun: 0xB23A48, mid: 0x6B4F7A, deep: 0x3A2E46, title: 0x3A2E46, byline: 0x8A3A48)
-  static let forest = CoverPalette(sky: 0xDCE6D2, sun: 0xE0703A, mid: 0x3F6B4F, deep: 0x2A4A38, title: 0x20352A, byline: 0x3F6B4F)
+  static let slateSea = CoverPalette(
+    sky: 0xC9D6DF,
+    sun: 0xF2B33D,
+    mid: 0x3B5B73,
+    deep: 0x22384A,
+    title: 0x1E2C38,
+    byline: 0x3B5B73
+  )
+  static let midnight = CoverPalette(
+    sky: 0x1D2A44,
+    sun: 0xF4C95D,
+    mid: 0x3C5A8C,
+    deep: 0x0F1830,
+    title: 0xF4EEDD,
+    byline: 0xF4C95D
+  )
+  static let orchard = CoverPalette(
+    sky: 0xF1E3C4,
+    sun: 0xC8402B,
+    mid: 0x4F7A4A,
+    deep: 0x8B6A3E,
+    title: 0x3A2A1A,
+    byline: 0x8B6A3E
+  )
+  static let ember = CoverPalette(
+    sky: 0x1E1A1A,
+    sun: 0xE4572E,
+    mid: 0x6B2A1F,
+    deep: 0x3A1712,
+    title: 0xF2E6D8,
+    byline: 0xF2A33A
+  )
+  static let dusk = CoverPalette(
+    sky: 0x2E2440,
+    sun: 0xF1D9A0,
+    mid: 0x5B3F6B,
+    deep: 0x8E5A7A,
+    title: 0xF1D9A0,
+    byline: 0xE8B9C6
+  )
+  static let rose = CoverPalette(
+    sky: 0xF3D5CF,
+    sun: 0xB23A48,
+    mid: 0x6B4F7A,
+    deep: 0x3A2E46,
+    title: 0x3A2E46,
+    byline: 0x8A3A48
+  )
+  static let forest = CoverPalette(
+    sky: 0xDCE6D2,
+    sun: 0xE0703A,
+    mid: 0x3F6B4F,
+    deep: 0x2A4A38,
+    title: 0x20352A,
+    byline: 0x3F6B4F
+  )
 }
 
 struct CoverSpec: Hashable {
@@ -26,7 +75,11 @@ struct CoverSpec: Hashable {
   var author: String
 
   static let saltRoad = CoverSpec(
-    layout: .saltRoad, palette: .slateSea, title: "The Salt Road", author: "Mara Kessling")
+    layout: .saltRoad,
+    palette: .slateSea,
+    title: "The Salt Road",
+    author: "Mara Kessling"
+  )
 }
 
 /// The full-colour jacket, drawn on a 100 x 100 grid.
@@ -50,7 +103,8 @@ struct CoverArtwork: View {
           Text(text)
             .font(.system(size: points * s, weight: .semibold, design: .serif))
             .tracking(0.4 * s)
-            .foregroundColor(titleColor))
+            .foregroundColor(titleColor)
+        )
       }
       func wrap(_ points: Double) -> [String] {
         var lines: [String] = []
@@ -70,7 +124,8 @@ struct CoverArtwork: View {
         Text(spec.author.uppercased())
           .font(.system(size: 5.2 * s, weight: .semibold))
           .tracking(1.5 * s)
-          .foregroundColor(bylineColor))
+          .foregroundColor(bylineColor)
+      )
       let lineHeights = lines.map { titleLine($0, titlePoints).measure(in: unbounded).height * 0.92 }
       let blockBottom = 9 + (lineHeights.reduce(0, +) + byline.measure(in: unbounded).height) / s + 2.5
       let artOffset = max(0, blockBottom + 2 - 31)
@@ -87,7 +142,9 @@ struct CoverArtwork: View {
         fill(Path(ellipseIn: rect(51, 35, 30, 30)), 0xC0522B)
         fill(Path(rect(0, 50, 100, 50)), 0x1E6971)
         fill(Path(rect(0, 50, 100, 5)), 0x2C7C83)
-        for r in [(52.0, 53.4, 9.0, 1.6), (68, 53.4, 11, 1.6), (55, 58.6, 5, 1.5), (70, 58.6, 7, 1.5), (73, 64, 3, 1.4)] {
+        for r in [
+          (52.0, 53.4, 9.0, 1.6), (68, 53.4, 11, 1.6), (55, 58.6, 5, 1.5), (70, 58.6, 7, 1.5), (73, 64, 3, 1.4),
+        ] {
           fill(Path(rect(r.0, r.1, r.2, r.3)), 0xE39A66)
         }
         var left = Path()
@@ -107,8 +164,10 @@ struct CoverArtwork: View {
         dash.move(to: pt(43, 100))
         dash.addLine(to: pt(64, 50.5))
         art.stroke(
-          dash, with: .color(Color(sirenHex: 0xC0522B)),
-          style: StrokeStyle(lineWidth: 0.8 * s, dash: [2.4 * s, 2.4 * s]))
+          dash,
+          with: .color(Color(sirenHex: 0xC0522B)),
+          style: StrokeStyle(lineWidth: 0.8 * s, dash: [2.4 * s, 2.4 * s])
+        )
 
       case .sunSea:
         fill(Path(rect(0, 0, 100, 100)), p.sky)
@@ -221,10 +280,12 @@ enum SketchFilter {
 
     // Tone: how dark each region is. Mid-tones get one hatch layer, the darkest get a second.
     let darkness = mono.applyingFilter("CIColorInvert")
-    let midMask = darkness
+    let midMask =
+      darkness
       .applyingFilter("CIColorControls", parameters: [kCIInputContrastKey: 1.6, kCIInputBrightnessKey: -0.18])
       .applyingFilter("CIColorClamp")
-    let deepMask = darkness
+    let deepMask =
+      darkness
       .applyingFilter("CIColorControls", parameters: [kCIInputContrastKey: 2.6, kCIInputBrightnessKey: -0.5])
       .applyingFilter("CIColorClamp")
 
@@ -233,12 +294,19 @@ enum SketchFilter {
     let cross = CIImage(cgImage: hatchTexture(size: size, angle: -.pi / 3.2, spacing: size.width / 58, seed: 29))
 
     let shaded = light.composited(over: paper)
-      .applyingFilter("CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: paper, kCIInputMaskImageKey: midMask])
+      .applyingFilter(
+        "CIBlendWithMask",
+        parameters: [kCIInputBackgroundImageKey: paper, kCIInputMaskImageKey: midMask]
+      )
     let crossed = cross.composited(over: shaded)
-      .applyingFilter("CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: shaded, kCIInputMaskImageKey: deepMask])
+      .applyingFilter(
+        "CIBlendWithMask",
+        parameters: [kCIInputBackgroundImageKey: shaded, kCIInputMaskImageKey: deepMask]
+      )
 
     // Outlines: one clean line per colour boundary.
-    let edges = input
+    let edges =
+      input
       .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 0.6]).cropped(to: extent)
       .applyingFilter("CIMorphologyGradient", parameters: [kCIInputRadiusKey: max(1.2, size.width / 400)])
       .applyingFilter("CIMaximumComponent")
@@ -256,7 +324,9 @@ enum SketchFilter {
       .cropped(to: extent)
     let pencil = CIImage(color: graphite).cropped(to: extent)
     let result = pencil.applyingFilter(
-      "CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: crossed, kCIInputMaskImageKey: edges])
+      "CIBlendWithMask",
+      parameters: [kCIInputBackgroundImageKey: crossed, kCIInputMaskImageKey: edges]
+    )
 
     guard let out = context.createCGImage(result, from: extent) else { return nil }
     return UIImage(cgImage: out, scale: image.scale, orientation: .up)
@@ -285,7 +355,9 @@ enum SketchFilter {
           let length = spacing * CGFloat(3 + rng.next() * 9)
           let drift = CGFloat(rng.next() - 0.5) * spacing * 0.35
           cg.setLineWidth(CGFloat(0.8 + rng.next() * 1.1) * size.width / 600)
-          cg.setStrokeColor(UIColor(red: 0.33, green: 0.345, blue: 0.37, alpha: CGFloat(0.28 + rng.next() * 0.32)).cgColor)
+          cg.setStrokeColor(
+            UIColor(red: 0.33, green: 0.345, blue: 0.37, alpha: CGFloat(0.28 + rng.next() * 0.32)).cgColor
+          )
           cg.move(to: CGPoint(x: x, y: y))
           cg.addLine(to: CGPoint(x: x + length, y: y + drift))
           cg.strokePath()
@@ -404,7 +476,8 @@ struct ChapterTicks: View {
         let heard = start <= progress
         ctx.fill(
           Path(rect),
-          with: .color(heard ? .white.opacity(isCurrent ? 0.95 : 0.7) : SirenTheme.graphite.opacity(0.6)))
+          with: .color(heard ? .white.opacity(isCurrent ? 0.95 : 0.7) : SirenTheme.graphite.opacity(0.6))
+        )
       }
     }
     .allowsHitTesting(false)

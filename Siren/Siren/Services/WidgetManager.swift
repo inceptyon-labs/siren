@@ -87,7 +87,7 @@ final class WidgetManager {
       playbackSpeed: player?.rate ?? 1.0
     )
 
-    if let sharedDefaults = UserDefaults(suiteName: "group.com.inceptyon.siren"), // SIREN: Siren identifiers
+    if let sharedDefaults = UserDefaults(suiteName: "group.com.inceptyon.siren"),  // SIREN: Siren identifiers
       let data = try? JSONEncoder().encode(state)
     {
       sharedDefaults.set(data, forKey: "playbackState")

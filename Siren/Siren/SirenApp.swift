@@ -75,7 +75,7 @@ struct SirenApp: App {
   }
 
   private func syncAccentColorToWidget(_ color: Color?) {
-    let sharedDefaults = UserDefaults(suiteName: "group.com.inceptyon.siren") // SIREN: Siren identifiers
+    let sharedDefaults = UserDefaults(suiteName: "group.com.inceptyon.siren")  // SIREN: Siren identifiers
     sharedDefaults?.set(color?.rawValue, forKey: "accentColor")
     WidgetCenter.shared.reloadAllTimelines()
   }
