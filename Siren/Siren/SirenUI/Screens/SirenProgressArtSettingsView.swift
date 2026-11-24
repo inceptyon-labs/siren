@@ -2,13 +2,13 @@ import Foundation
 import SwiftUI
 
 struct SirenProgressArtSettingsView: View {
-  @State private var style: SirenArtStyleChoice = .coverReveal
-  @State private var showInPlayer = true
-  @State private var showOnFinishedShelf = true
-  @State private var goalUnit: SirenGoalUnit = .books
-  @State private var bookGoal = 20
-  @State private var hourGoal = 150
-  @State private var showGoalOnHome = true
+  @AppStorage(SirenSettings.artStyle) private var style: SirenArtStyleChoice = .coverReveal
+  @AppStorage(SirenSettings.artInPlayer) private var showInPlayer = true
+  @AppStorage(SirenSettings.artOnFinishedShelf) private var showOnFinishedShelf = true
+  @AppStorage(SirenSettings.goalUnit) private var goalUnit: SirenGoalUnit = .books
+  @AppStorage(SirenSettings.bookGoal) private var bookGoal = 20
+  @AppStorage(SirenSettings.hourGoal) private var hourGoal = 150
+  @AppStorage(SirenSettings.goalOnHome) private var showGoalOnHome = true
 
   var body: some View {
     List {
@@ -190,7 +190,7 @@ private struct SirenVoicePrintThumbnail: View {
   }()
 }
 
-private enum SirenArtStyleChoice: CaseIterable, Identifiable {
+enum SirenArtStyleChoice: String, CaseIterable, Identifiable {
   case off, coverReveal, map, voicePrint
 
   var id: Self { self }
@@ -214,7 +214,7 @@ private enum SirenArtStyleChoice: CaseIterable, Identifiable {
   }
 }
 
-private enum SirenGoalUnit: Hashable {
+enum SirenGoalUnit: String, Hashable {
   case books, hours
 }
 

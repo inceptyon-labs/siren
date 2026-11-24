@@ -1,12 +1,43 @@
 import Foundation
 import SwiftUI
 
-struct SirenPlayerView: View {
-  @Binding var art: PlayerArt
-  var onCarMode: () -> Void
+/// What the player's transport shows and does. Demo screens pass fixed values; the live player
+/// reads them from upstream's `BookPlayer.Model`.
+struct SirenPlayback {
+  var isPlaying = true
+  var isLoading = false
+  /// Scrubber position, 0...1 of the chapter (or of the book, per the player preference).
+  var position: Double = 0
+  var elapsed = ""
+  var remaining = ""
+  var bookLeft = ""
+  var skipBack = 30
+  var skipForward = 30
+  var speed = "1×"
+  /// Sleep timer label; nil when the timer is off.
+  var sleep: String?
+  var canGoPreviousChapter = true
+  var canGoNextChapter = true
 
-  private let book = Demo.saltRoad
-  @State private var scrub = Demo.saltRoad.chapterProgress
+  /// Called while dragging (`true`) and once on release (`false`).
+  var onScrub: (Double, Bool) -> Void = { _, _ in }
+  var onTogglePlay: () -> Void = {}
+  var onSkipBack: () -> Void = {}
+  var onSkipForward: () -> Void = {}
+  var onPreviousChapter: () -> Void = {}
+  var onNextChapter: () -> Void = {}
+  var onSpeed: () -> Void = {}
+  var onSleep: () -> Void = {}
+  var onBookmarks: () -> Void = {}
+  var onChapters: () -> Void = {}
+}
+
+struct SirenPlayerView<MoreMenu: View>: View {
+  let book: SirenBook
+  let playback: SirenPlayback
+  var pages: [PlayerArt] = PlayerArt.allCases
+  @Binding var art: PlayerArt
+  @ViewBuilder var moreMenu: () -> MoreMenu
 
   var body: some View {
     GeometryReader { geo in
@@ -38,6 +69,16 @@ struct SirenPlayerView: View {
     .tint(SirenTheme.tint)
   }
 
+  private var byline: String {
+    book.narrator.isEmpty ? book.author : "\(book.author) · read by \(book.narrator)"
+  }
+
+  private var chapterLine: String? {
+    guard book.chapterCount > 1 else { return nil }
+    return book.chapterTitle.isEmpty
+      ? "Ch \(book.currentChapter)" : "Ch \(book.currentChapter) · \(book.chapterTitle)"
+  }
+
   private var controls: some View {
     VStack(spacing: 0) {
 
@@ -46,17 +87,30 @@ struct SirenPlayerView: View {
           Text(book.title)
             .font(SirenType.bookTitle(.title))
             .foregroundStyle(SirenTheme.ink)
+            .lineLimit(2)
           Spacer()
-          moreMenu
+          Menu(content: moreMenu) {
+            Image(systemName: "ellipsis")
+              .font(.title3.weight(.semibold))
+              .frame(width: 44, height: 44)
+              .contentShape(Rectangle())
+          }
+          .foregroundStyle(SirenTheme.ink)
+          .accessibilityLabel("More")
         }
-        Text("\(book.author) · read by \(book.narrator)")
+        Text(byline)
           .font(.subheadline)
           .foregroundStyle(SirenTheme.secondary)
-        Text("Ch \(book.currentChapter) · \(book.chapterTitle)")
-          .font(.subheadline.weight(.semibold))
-          .foregroundStyle(SirenTheme.ink)
-          .padding(.top, 2)
+          .lineLimit(1)
+        if let chapterLine {
+          Text(chapterLine)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(SirenTheme.ink)
+            .lineLimit(1)
+            .padding(.top, 2)
+        }
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.horizontal, 24)
       .padding(.top, 18)
 
@@ -66,6 +120,7 @@ struct SirenPlayerView: View {
 
       transport
         .padding(.top, 18)
+        .disabled(playback.isLoading)
 
       Spacer(minLength: 12)
 
@@ -75,63 +130,68 @@ struct SirenPlayerView: View {
     }
   }
 
-  private func artArea(side: CGFloat) -> some View {
-    TabView(selection: $art) {
-      RevealCover(book: book, showTicks: true, cornerRadius: 10)
+  @ViewBuilder private func artArea(side: CGFloat) -> some View {
+    if pages.count > 1 {
+      TabView(selection: $art) {
+        ForEach(pages) { page in
+          artPage(page)
+            .padding(4)
+            .tag(page)
+        }
+      }
+      .tabViewStyle(.page(indexDisplayMode: .never))
+      .frame(width: side + 8, height: side + 8)
+    } else {
+      artPage(.cover)
         .padding(4)
-        .tag(PlayerArt.cover)
+        .frame(width: side + 8, height: side + 8)
+    }
+  }
+
+  @ViewBuilder private func artPage(_ page: PlayerArt) -> some View {
+    switch page {
+    case .cover:
+      RevealCover(book: book, showTicks: true, cornerRadius: 10, resolution: .large)
+    case .map:
       Image("SirenDemoMapSaltRoad")
         .resizable()
         .scaledToFit()
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .padding(4)
-        .accessibilityLabel("Map of The Salt Road, 57 percent uncovered")
-        .tag(PlayerArt.map)
+        .accessibilityLabel("Map of \(book.title), \(Int((book.progress * 100).rounded())) percent uncovered")
+    case .voice:
       VoicePrintView(book: book)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .padding(4)
-        .tag(PlayerArt.voice)
     }
-    .tabViewStyle(.page(indexDisplayMode: .never))
-    .frame(width: side + 8, height: side + 8)
   }
 
-  private var pageDots: some View {
-    HStack(spacing: 8) {
-      ForEach(PlayerArt.allCases) { item in
-        Circle()
-          .fill(item == art ? SirenTheme.tint : SirenTheme.secondary.opacity(0.45))
-          .frame(width: 7, height: 7)
+  @ViewBuilder private var pageDots: some View {
+    if pages.count > 1 {
+      HStack(spacing: 8) {
+        ForEach(pages) { item in
+          Circle()
+            .fill(item == art ? SirenTheme.tint : SirenTheme.secondary.opacity(0.45))
+            .frame(width: 7, height: 7)
+        }
       }
+      .accessibilityElement(children: .ignore)
+      .accessibilityLabel("Art view: \(art.label)")
     }
-    .accessibilityElement(children: .ignore)
-    .accessibilityLabel("Art view: \(art.label)")
-  }
-
-  private var moreMenu: some View {
-    Menu {
-      Button("Car Mode", systemImage: "car", action: onCarMode)
-      Button("Send…", systemImage: "paperplane") {}
-      Button("Go to Book", systemImage: "book") {}
-    } label: {
-      Image(systemName: "ellipsis")
-        .font(.title3.weight(.semibold))
-        .frame(width: 44, height: 44)
-        .contentShape(Rectangle())
-    }
-    .foregroundStyle(SirenTheme.ink)
-    .accessibilityLabel("More")
   }
 
   private var scrubber: some View {
     VStack(spacing: 6) {
-      Slider(value: $scrub)
+      Slider(
+        value: Binding(get: { playback.position }, set: { playback.onScrub($0, true) }),
+        onEditingChanged: { editing in
+          if !editing { playback.onScrub(playback.position, false) }
+        }
+      )
       HStack {
-        Text("12:28")
+        Text(playback.elapsed)
         Spacer()
-        Text("\(book.timeLeft) left in book")
+        Text("\(playback.bookLeft) left in book")
         Spacer()
-        Text("−\(book.chapterRemaining)")
+        Text("−\(playback.remaining)")
       }
       .font(.caption.weight(.medium))
       .monospacedDigit()
@@ -141,28 +201,49 @@ struct SirenPlayerView: View {
 
   private var transport: some View {
     HStack(spacing: 0) {
-      transportButton("backward.end.fill", label: "Previous chapter", size: .title2)
-      transportButton("gobackward.30", label: "Back 30 seconds", size: .largeTitle)
-      Button {
-      } label: {
-        Image(systemName: "pause.fill")
-          .font(.system(size: 30, weight: .bold))
-          .foregroundStyle(SirenTheme.onTint)
-          .frame(width: 76, height: 76)
-          .background(SirenTheme.tint, in: Circle())
+      transportButton("backward.end.fill", label: "Previous chapter", size: .title2, action: playback.onPreviousChapter)
+        .disabled(!playback.canGoPreviousChapter)
+      transportButton(
+        "gobackward.\(playback.skipBack)",
+        label: "Back \(playback.skipBack) seconds",
+        size: .largeTitle,
+        action: playback.onSkipBack
+      )
+      Button(action: playback.onTogglePlay) {
+        Group {
+          if playback.isLoading {
+            ProgressView().tint(SirenTheme.onTint)
+          } else {
+            Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
+              .font(.system(size: 30, weight: .bold))
+          }
+        }
+        .foregroundStyle(SirenTheme.onTint)
+        .frame(width: 76, height: 76)
+        .background(SirenTheme.tint, in: Circle())
       }
       .buttonStyle(.plain)
-      .accessibilityLabel("Pause")
+      .accessibilityLabel(playback.isPlaying ? "Pause" : "Play")
       .frame(maxWidth: .infinity)
-      transportButton("goforward.30", label: "Forward 30 seconds", size: .largeTitle)
-      transportButton("forward.end.fill", label: "Next chapter", size: .title2)
+      transportButton(
+        "goforward.\(playback.skipForward)",
+        label: "Forward \(playback.skipForward) seconds",
+        size: .largeTitle,
+        action: playback.onSkipForward
+      )
+      transportButton("forward.end.fill", label: "Next chapter", size: .title2, action: playback.onNextChapter)
+        .disabled(!playback.canGoNextChapter)
     }
     .padding(.horizontal, 12)
   }
 
-  private func transportButton(_ symbol: String, label: String, size: Font) -> some View {
-    Button {
-    } label: {
+  private func transportButton(
+    _ symbol: String,
+    label: String,
+    size: Font,
+    action: @escaping () -> Void
+  ) -> some View {
+    Button(action: action) {
       Image(systemName: symbol)
         .font(size.weight(.regular))
         .frame(width: 56, height: 56)
@@ -176,31 +257,35 @@ struct SirenPlayerView: View {
 
   private var utilityRow: some View {
     HStack {
-      Button {
-      } label: {
-        Text("1.3×").font(.headline).monospacedDigit()
+      Button(action: playback.onSpeed) {
+        Text(playback.speed).font(.headline).monospacedDigit()
       }
-      .accessibilityLabel("Speed 1.3 times")
+      .accessibilityLabel("Speed \(playback.speed)")
       Spacer()
-      Button {
-      } label: {
-        Label("30 min", systemImage: "moon.zzz").font(.subheadline.weight(.semibold))
+      Button(action: playback.onSleep) {
+        if let sleep = playback.sleep {
+          Label(sleep, systemImage: "moon.zzz.fill").font(.subheadline.weight(.semibold)).monospacedDigit()
+        } else {
+          Image(systemName: "moon.zzz").font(.title3).frame(width: 44, height: 44)
+        }
       }
-      .accessibilityLabel("Sleep timer, 30 minutes")
+      .accessibilityLabel(playback.sleep.map { "Sleep timer, \($0)" } ?? "Sleep timer")
       Spacer()
-      utility("airplay.audio", "AirPlay")
+      AirPlayButton()
+        .frame(width: 44, height: 44)
+        .accessibilityLabel("AirPlay")
       Spacer()
-      utility("bookmark", "Add bookmark")
+      utility("bookmark", "Bookmarks", action: playback.onBookmarks)
       Spacer()
-      utility("list.bullet", "Chapters")
+      utility("list.bullet", "Chapters", action: playback.onChapters)
+        .disabled(book.chapterCount < 2)
     }
     .foregroundStyle(SirenTheme.tint)
     .frame(minHeight: 44)
   }
 
-  private func utility(_ symbol: String, _ label: String) -> some View {
-    Button {
-    } label: {
+  private func utility(_ symbol: String, _ label: String, action: @escaping () -> Void) -> some View {
+    Button(action: action) {
       Image(systemName: symbol)
         .font(.title3)
         .frame(width: 44, height: 44)
@@ -214,7 +299,7 @@ struct SirenPlayerView: View {
 /// Demo envelopes are synthetic, seeded from the book ID; the real ones come from the
 /// loudness scan that trim silence already needs.
 struct VoicePrintView: View {
-  let book: DemoBook
+  let book: SirenBook
 
   var body: some View {
     ZStack(alignment: .topTrailing) {
@@ -321,5 +406,7 @@ struct VoicePrintView: View {
 }
 
 #Preview {
-  SirenPlayerView(art: .constant(.voice), onCarMode: {})
+  SirenPlayerView(book: Demo.saltRoad, playback: Demo.playback, art: .constant(.voice)) {
+    Button("Car Mode", systemImage: "car") {}
+  }
 }

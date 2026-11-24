@@ -24,7 +24,11 @@ struct SirenLibraryView: View {
         if scope == .books {
           LazyVGrid(columns: columns, alignment: .leading, spacing: 22) {
             ForEach(books) { book in
-              SirenLibraryCell(book: book)
+              Button {
+              } label: {
+                SirenLibraryCell(book: book)
+              }
+              .buttonStyle(.plain)
             }
           }
         } else {
@@ -80,7 +84,7 @@ struct SirenLibraryView: View {
   }
 
   /// Demo.library repeats two titles from the finished shelf; show each book once.
-  private var books: [DemoBook] {
+  private var books: [SirenBook] {
     var seen = Set<String>()
     let shelf = Demo.library.filter { seen.insert($0.title).inserted }
     let shown = shelf.filter { shelfFilter.includes($0) }
@@ -95,40 +99,38 @@ struct SirenLibraryView: View {
   }
 }
 
-private struct SirenLibraryCell: View {
-  let book: DemoBook
+/// A grid cell: cover, title and where you are in the book. Wrap it in a link or button.
+struct SirenLibraryCell: View {
+  let book: SirenBook
 
   var body: some View {
-    Button {
-    } label: {
-      VStack(alignment: .leading, spacing: 8) {
-        RevealCover(book: book)
-        VStack(alignment: .leading, spacing: 2) {
-          Text(book.title)
-            .font(SirenType.bookTitle(.footnote))
-            .foregroundStyle(SirenTheme.ink)
-            .multilineTextAlignment(.leading)
-            .lineLimit(2, reservesSpace: true)
-          Text(caption)
-            .font(.caption)
-            .foregroundStyle(SirenTheme.secondary)
-            .monospacedDigit()
-            .lineLimit(1)
-        }
+    VStack(alignment: .leading, spacing: 8) {
+      RevealCover(book: book)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(book.title)
+          .font(SirenType.bookTitle(.footnote))
+          .foregroundStyle(SirenTheme.ink)
+          .multilineTextAlignment(.leading)
+          .lineLimit(2, reservesSpace: true)
+        Text(caption)
+          .font(.caption)
+          .foregroundStyle(SirenTheme.secondary)
+          .monospacedDigit()
+          .lineLimit(1)
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .contentShape(Rectangle())
     }
-    .buttonStyle(.plain)
-    .accessibilityLabel(Text("\(book.title), \(book.author)"))
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .contentShape(Rectangle())
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(Text(book.author.isEmpty ? book.title : "\(book.title), \(book.author)"))
     .accessibilityValue(spokenStatus)
   }
 
   private var caption: String {
     if book.isFinished { return String(localized: "Finished") }
     if book.isStarted { return book.progress.formatted(.percent.precision(.fractionLength(0))) }
-    let minutes = Int((book.hours * 60).rounded())
-    return String(localized: "\(minutes / 60)h \(minutes % 60)m")
+    if book.hours <= 0 { return book.author }
+    return SirenFormat.span(book.hours * 3600)
   }
 
   private var spokenStatus: String {
@@ -140,7 +142,7 @@ private struct SirenLibraryCell: View {
   }
 }
 
-private enum SirenLibraryScope: CaseIterable, Identifiable {
+enum SirenLibraryScope: CaseIterable, Identifiable {
   case books, series, authors
 
   var id: Self { self }
@@ -190,7 +192,7 @@ private enum SirenLibraryFilter: CaseIterable, Identifiable {
     }
   }
 
-  func includes(_ book: DemoBook) -> Bool {
+  func includes(_ book: SirenBook) -> Bool {
     switch self {
     case .all: true
     case .inProgress: book.isStarted && !book.isFinished

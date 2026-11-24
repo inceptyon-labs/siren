@@ -1,3 +1,4 @@
+import API
 import Foundation
 import SwiftUI
 
@@ -34,12 +35,17 @@ enum SirenRoute: Hashable {
   case progressArt
 }
 
+/// Demo screens with `-SirenDemo`, upstream's screens for podcast libraries, Siren's otherwise.
 struct SirenRootSwitch: View {
+  @ObservedObject private var libraries = Audiobookshelf.shared.libraries
+
   var body: some View {
     if let screen = SirenDemoScreen.requested {
       SirenDemoRoot(screen: screen)
-    } else {
+    } else if libraries.current?.mediaType == .podcast {
       ContentView()
+    } else {
+      SirenLiveRoot()
     }
   }
 }
@@ -61,12 +67,14 @@ struct SirenDemoRoot: View {
       .tint(SirenTheme.tint)
       .onAppear(perform: route)
       .sheet(isPresented: $showPlayer) {
-        SirenPlayerView(
-          art: $playerArt,
-          onCarMode: {
-            showPlayer = false; showCar = true
+        SirenPlayerView(book: Demo.saltRoad, playback: Demo.playback, art: $playerArt) {
+          Button("Car Mode", systemImage: "car") {
+            showPlayer = false
+            showCar = true
           }
-        )
+          Button("Send…", systemImage: "paperplane") {}
+          Button("Go to Book", systemImage: "book") {}
+        }
         .presentationDragIndicator(.visible)
         .sirenPageSizing()
       }
@@ -156,47 +164,6 @@ struct SirenDemoRoot: View {
     case .progressArt:
       SirenProgressArtSettingsView()
     }
-  }
-}
-
-struct SirenMiniPlayer: View {
-  let book: DemoBook
-  var onOpen: () -> Void
-
-  var body: some View {
-    HStack(spacing: 12) {
-      RevealCover(book: book, cornerRadius: 4, shadow: false)
-        .frame(width: 34, height: 34)
-      VStack(alignment: .leading, spacing: 1) {
-        Text(book.title)
-          .font(SirenType.bookTitle(.subheadline))
-          .foregroundStyle(SirenTheme.ink)
-        Text("Ch \(book.currentChapter) · \(book.chapterRemaining) left")
-          .font(.caption)
-          .foregroundStyle(SirenTheme.secondary)
-          .monospacedDigit()
-      }
-      Spacer(minLength: 8)
-      Button {
-      } label: {
-        Image(systemName: "pause.fill").font(.title3)
-      }
-      .buttonStyle(.plain)
-      .frame(width: 44, height: 44)
-      .accessibilityLabel("Pause")
-      Button {
-      } label: {
-        Image(systemName: "goforward.30").font(.title3)
-      }
-      .buttonStyle(.plain)
-      .frame(width: 44, height: 44)
-      .accessibilityLabel("Forward 30 seconds")
-    }
-    .foregroundStyle(SirenTheme.ink)
-    .padding(.leading, 10)
-    .padding(.trailing, 4)
-    .contentShape(Rectangle())
-    .onTapGesture(perform: onOpen)
   }
 }
 

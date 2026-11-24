@@ -29,47 +29,6 @@ enum DemoRequestStatus: Hashable {
   }
 }
 
-struct DemoBook: Identifiable, Hashable {
-  let id: String
-  let title: String
-  let author: String
-  var narrator = ""
-  var series: String?
-  var seriesIndex: Int?
-  var hours: Double = 10
-  /// 0...1 of the whole book heard.
-  var progress: Double = 0
-  var chapterCount = 30
-  var currentChapter = 1
-  var chapterTitle = ""
-  var chapterProgress: Double = 0
-  var chapterRemaining = ""
-  var timeLeft = ""
-  var rating: Double = 4.5
-  var ratingCount = 1000
-  var genre = "Fiction"
-  var cover: CoverSpec
-  var request: DemoRequestStatus?
-  var releaseDate: String?
-  var finishedOn: String?
-  var inLibrary = true
-
-  var isFinished: Bool { progress >= 1 }
-  var isStarted: Bool { progress > 0 }
-
-  /// Start of each chapter as a fraction of the book, for the reveal's tick marks.
-  var chapterStarts: [Double] {
-    guard chapterCount > 1 else { return [0] }
-    if id == Demo.saltRoad.id {
-      // Long opening chapters, shorter ones later: chapter 14 starts at 0.55.
-      let early = (0..<13).map { Double($0) * 0.55 / 13 }
-      let late = (0..<(chapterCount - 13)).map { 0.55 + Double($0) * 0.45 / Double(chapterCount - 13) }
-      return early + late
-    }
-    return (0..<chapterCount).map { Double($0) / Double(chapterCount) }
-  }
-}
-
 enum Demo {
   static let jason = DemoMember(id: "u_jason", name: "Jason", color: Color(sirenHex: 0x3B4A5C), isAdmin: true)
   static let sarah = DemoMember(id: "u_sarah", name: "Sarah", color: Color(sirenHex: 0x8E4A8C))
@@ -81,7 +40,7 @@ enum Demo {
   )
   static let household = [sarah, kids]
 
-  static let saltRoad = DemoBook(
+  static let saltRoad = SirenBook(
     id: "li_salt_road_2",
     title: "The Salt Road",
     author: "Mara Kessling",
@@ -102,7 +61,7 @@ enum Demo {
     cover: .saltRoad
   )
 
-  static let harborOfBells = DemoBook(
+  static let harborOfBells = SirenBook(
     id: "li_harbor_of_bells_1",
     title: "Harbor of Bells",
     author: "Mara Kessling",
@@ -119,7 +78,7 @@ enum Demo {
     finishedOn: "Oct 2"
   )
 
-  static let ninthTide = DemoBook(
+  static let ninthTide = SirenBook(
     id: "li_ninth_tide_3",
     title: "The Ninth Tide",
     author: "Mara Kessling",
@@ -136,7 +95,7 @@ enum Demo {
     inLibrary: false
   )
 
-  static let stormglass = DemoBook(
+  static let stormglass = SirenBook(
     id: "asin_stormglass_4",
     title: "Stormglass",
     author: "Mara Kessling",
@@ -153,7 +112,7 @@ enum Demo {
     inLibrary: false
   )
 
-  static let glassOrchard = DemoBook(
+  static let glassOrchard = SirenBook(
     id: "li_glass_orchard",
     title: "The Glass Orchard",
     author: "Ines Calloway",
@@ -172,7 +131,7 @@ enum Demo {
     cover: CoverSpec(layout: .tree, palette: .orchard, title: "The Glass Orchard", author: "Ines Calloway")
   )
 
-  static let emberAndAsh = DemoBook(
+  static let emberAndAsh = SirenBook(
     id: "li_ember_and_ash",
     title: "Ember & Ash",
     author: "T. R. Halvorsen",
@@ -187,7 +146,7 @@ enum Demo {
     inLibrary: false
   )
 
-  static let lanternCountry = DemoBook(
+  static let lanternCountry = SirenBook(
     id: "li_lantern_country",
     title: "Lantern Country",
     author: "Ruth Abernathy",
@@ -203,7 +162,7 @@ enum Demo {
     inLibrary: false
   )
 
-  static let wolves = DemoBook(
+  static let wolves = SirenBook(
     id: "li_wolves_quiet_shore",
     title: "Wolves of the Quiet Shore",
     author: "Callum Reyes",
@@ -217,7 +176,7 @@ enum Demo {
     inLibrary: false
   )
 
-  static let smallHours = DemoBook(
+  static let smallHours = SirenBook(
     id: "li_map_small_hours",
     title: "A Map of Small Hours",
     author: "Noor Haddad",
@@ -232,7 +191,7 @@ enum Demo {
     finishedOn: "Sep 14"
   )
 
-  static let cartographersWidow = DemoBook(
+  static let cartographersWidow = SirenBook(
     id: "li_cartographers_widow",
     title: "The Cartographer's Widow",
     author: "Elena Marsh",
@@ -246,7 +205,7 @@ enum Demo {
     cover: CoverSpec(layout: .tower, palette: .forest, title: "The Cartographer's Widow", author: "Elena Marsh")
   )
 
-  static let ironAndOrchid = DemoBook(
+  static let ironAndOrchid = SirenBook(
     id: "li_iron_and_orchid",
     title: "Iron and Orchid",
     author: "Sam Whitlock",
@@ -262,13 +221,13 @@ enum Demo {
   static let tidewater = [harborOfBells, saltRoad, ninthTide, stormglass]
   static let requests = [ninthTide, emberAndAsh, lanternCountry]
 
-  static let library: [DemoBook] =
+  static let library: [SirenBook] =
     [
       saltRoad, glassOrchard, cartographersWidow, harborOfBells, smallHours, ironAndOrchid,
     ] + finished2026.dropFirst(2).prefix(9)
 
   /// The 14 books finished this year (personal goal: 20).
-  static let finished2026: [DemoBook] = {
+  static let finished2026: [SirenBook] = {
     let titles: [(String, String, CoverLayout, CoverPalette)] = [
       ("Harbor of Bells", "Mara Kessling", .tower, .slateSea),
       ("A Map of Small Hours", "Noor Haddad", .moonHills, .rose),
@@ -286,7 +245,7 @@ enum Demo {
       ("Saltwater Psalms", "Odette Gray", .waves, .forest),
     ]
     return titles.enumerated().map { i, t in
-      DemoBook(
+      SirenBook(
         id: "li_done_\(i)",
         title: t.0,
         author: t.1,
@@ -298,11 +257,20 @@ enum Demo {
 
   static let yearlyGoal = 20
 
+  static let playback = SirenPlayback(
+    position: saltRoad.chapterProgress,
+    elapsed: "12:28",
+    remaining: saltRoad.chapterRemaining,
+    bookLeft: saltRoad.timeLeft,
+    speed: "1.3×",
+    sleep: "30 min"
+  )
+
   /// What Jason sent Sarah, shown on her Home as "From Jason".
-  static let sentToSarah: [(book: DemoBook, sent: String, note: String?, progress: Double)] = [
+  static let sentToSarah: [(book: SirenBook, sent: String, note: String?, progress: Double)] = [
     (harborOfBells, "today", "Start with the first one. You'll love the ferry chapter.", 0),
     (saltRoad, "today", nil, 0),
     (glassOrchard, "Nov 18", nil, 0.41),
   ]
-  static let catalogResults: [DemoBook] = [ninthTide, stormglass, saltRoad, harborOfBells, wolves]
+  static let catalogResults: [SirenBook] = [ninthTide, stormglass, saltRoad, harborOfBells, wolves]
 }

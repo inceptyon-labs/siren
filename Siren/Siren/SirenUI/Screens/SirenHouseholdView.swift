@@ -50,7 +50,7 @@ struct SirenHouseholdView: View {
     }
   }
 
-  private func memberRow(_ member: DemoMember, book: DemoBook?, detail: String, live: Bool) -> some View {
+  private func memberRow(_ member: DemoMember, book: SirenBook?, detail: String, live: Bool) -> some View {
     HStack(spacing: 12) {
       HouseholdPlate(member: member, size: 36)
       VStack(alignment: .leading, spacing: 2) {
@@ -81,7 +81,7 @@ struct SirenHouseholdView: View {
     .accessibilityElement(children: .combine)
   }
 
-  private func sentRow(_ book: DemoBook, to member: DemoMember, status: String) -> some View {
+  private func sentRow(_ book: SirenBook, to member: DemoMember, status: String) -> some View {
     HStack(spacing: 12) {
       RevealCover(book: book, progress: progress(of: book, for: member), cornerRadius: 4, shadow: false)
         .frame(width: 44, height: 44)
@@ -100,7 +100,7 @@ struct SirenHouseholdView: View {
   }
 
   /// How far the recipient is, which is what the sender's cover shows here.
-  private func progress(of book: DemoBook, for member: DemoMember) -> Double {
+  private func progress(of book: SirenBook, for member: DemoMember) -> Double {
     switch book.id {
     case Demo.glassOrchard.id: 0.41
     case Demo.smallHours.id: 1

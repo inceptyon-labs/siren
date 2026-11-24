@@ -13,7 +13,7 @@ struct SirenRequestSearchView: View {
     case library, request
   }
 
-  private var results: [DemoBook] {
+  private var results: [SirenBook] {
     switch scope {
     case .library: Demo.catalogResults.filter { $0.inLibrary }
     case .request: Demo.catalogResults
@@ -77,7 +77,7 @@ struct SirenRequestSearchView: View {
 
   // MARK: Rows
 
-  private func resultRow(_ book: DemoBook) -> some View {
+  private func resultRow(_ book: SirenBook) -> some View {
     let layout =
       dynamicTypeSize.isAccessibilitySize
       ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
@@ -110,7 +110,7 @@ struct SirenRequestSearchView: View {
     .padding(.vertical, 6)
   }
 
-  @ViewBuilder private func meta(for book: DemoBook) -> some View {
+  @ViewBuilder private func meta(for book: SirenBook) -> some View {
     if book.rating > 0 {
       StarRating(rating: book.rating, count: book.ratingCount)
     }
@@ -122,7 +122,7 @@ struct SirenRequestSearchView: View {
     }
   }
 
-  private func byline(for book: DemoBook) -> String {
+  private func byline(for book: SirenBook) -> String {
     guard let series = book.series else { return book.author }
     guard let index = book.seriesIndex else { return "\(book.author) · \(series)" }
     return "\(book.author) · \(series), Book \(index)"
@@ -144,7 +144,7 @@ struct SirenRequestSearchView: View {
     case requestable(releaseDate: String?)
   }
 
-  private func rowState(for book: DemoBook) -> RowState {
+  private func rowState(for book: SirenBook) -> RowState {
     if book.inLibrary { return .play }
     if requested.contains(book.id) { return .requested }
     if let request = book.request {
@@ -154,7 +154,7 @@ struct SirenRequestSearchView: View {
     return .requestable(releaseDate: book.releaseDate)
   }
 
-  @ViewBuilder private func stateControl(for book: DemoBook) -> some View {
+  @ViewBuilder private func stateControl(for book: SirenBook) -> some View {
     switch rowState(for: book) {
     case .play:
       Button("Play") {}

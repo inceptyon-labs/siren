@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Book detail for the design review, bound to demo data.
 struct SirenBookDetailView: View {
-  let book: DemoBook
+  let book: SirenBook
   var onSend: () -> Void
   var onPlay: () -> Void
 
@@ -194,7 +194,7 @@ struct SirenBookDetailView: View {
 
   // MARK: Series
 
-  private var seriesBooks: [DemoBook] {
+  private var seriesBooks: [SirenBook] {
     guard let series = book.series else { return [] }
     return Demo.tidewater
       .filter { $0.series == series }
@@ -219,7 +219,7 @@ struct SirenBookDetailView: View {
     }
   }
 
-  private func seriesItem(_ item: DemoBook) -> some View {
+  private func seriesItem(_ item: SirenBook) -> some View {
     VStack(alignment: .leading, spacing: 6) {
       if item.id == book.id {
         seriesTile(item)
@@ -234,7 +234,7 @@ struct SirenBookDetailView: View {
     .frame(width: seriesCoverSide, alignment: .leading)
   }
 
-  private func seriesTile(_ item: DemoBook) -> some View {
+  private func seriesTile(_ item: SirenBook) -> some View {
     VStack(alignment: .leading, spacing: 8) {
       RevealCover(book: item)
         .frame(width: seriesCoverSide, height: seriesCoverSide)
@@ -250,7 +250,7 @@ struct SirenBookDetailView: View {
     .accessibilityLabel(item.seriesIndex.map { "\(item.title), book \($0)" } ?? item.title)
   }
 
-  @ViewBuilder private func seriesStatus(_ item: DemoBook) -> some View {
+  @ViewBuilder private func seriesStatus(_ item: SirenBook) -> some View {
     switch shelfState(of: item) {
     case .finished(let date):
       caption(date.map { "Finished \($0)" } ?? "Finished")
@@ -357,7 +357,9 @@ struct SirenBookDetailView: View {
     if book.chapterCount > 1 {
       rows.append(DetailRow(label: "Chapters", value: "\(book.chapterCount)"))
     }
-    rows.append(DetailRow(label: "Genre", value: book.genre))
+    if !book.genre.isEmpty {
+      rows.append(DetailRow(label: "Genre", value: book.genre))
+    }
     if let added = book.detailAddedOn {
       rows.append(DetailRow(label: "Added", value: added))
     }
@@ -380,7 +382,7 @@ struct SirenBookDetailView: View {
     case requestable(releaseDate: String?)
   }
 
-  private func shelfState(of item: DemoBook) -> ShelfState {
+  private func shelfState(of item: SirenBook) -> ShelfState {
     if item.inLibrary {
       if item.isFinished { return .finished(item.finishedOn) }
       if item.isStarted { return .playing(item.progress) }
@@ -409,7 +411,7 @@ struct SirenBookDetailView: View {
 }
 
 /// Shows the book title in the navigation bar only once the hero title has scrolled under it.
-private struct BookDetailNavigationTitle: ViewModifier {
+struct BookDetailNavigationTitle: ViewModifier {
   let title: String
   let revealOffset: CGFloat
 
@@ -453,7 +455,7 @@ private struct BookDetailNavigationTitle: ViewModifier {
   }
 }
 
-private struct BookDetailCapsuleStyle: ButtonStyle {
+struct BookDetailCapsuleStyle: ButtonStyle {
   enum Kind { case filled, wash }
 
   var kind: Kind
@@ -473,7 +475,7 @@ private struct BookDetailCapsuleStyle: ButtonStyle {
   }
 }
 
-private extension DemoBook {
+private extension SirenBook {
   /// Synthetic jacket copy for the demo books.
   var detailBlurb: String {
     switch id {

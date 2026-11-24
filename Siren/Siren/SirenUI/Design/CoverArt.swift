@@ -1,9 +1,11 @@
 import CoreImage
+import CryptoKit
+import Nuke
 import SwiftUI
 import UIKit
 
-// Demo covers are drawn in SwiftUI so the review build needs no server. In the real app the colour
-// image comes from Audiobookshelf and the sketch is made from it by `SketchFilter`.
+// Demo covers are drawn in SwiftUI so the review build needs no server. In the app the colour image
+// comes from Audiobookshelf and the sketch is made from it by `SketchFilter`.
 
 enum CoverLayout: Hashable { case saltRoad, sunSea, mountains, tree, moonHills, tower, ship, waves }
 
@@ -80,6 +82,19 @@ struct CoverSpec: Hashable {
     title: "The Salt Road",
     author: "Mara Kessling"
   )
+
+  /// A drawn jacket for a book with no server cover. The ID picks the layout and palette.
+  static func placeholder(id: String, title: String, author: String) -> CoverSpec {
+    let layouts: [CoverLayout] = [.sunSea, .mountains, .tree, .moonHills, .tower, .ship, .waves]
+    let palettes: [CoverPalette] = [.slateSea, .midnight, .orchard, .ember, .dusk, .rose, .forest]
+    let seed = id.sirenSeed
+    return CoverSpec(
+      layout: layouts[seed % layouts.count],
+      palette: palettes[(seed / layouts.count) % palettes.count],
+      title: title,
+      author: author
+    )
+  }
 }
 
 /// The full-colour jacket, drawn on a 100 x 100 grid.
@@ -332,12 +347,13 @@ enum SketchFilter {
     return UIImage(cgImage: out, scale: image.scale, orientation: .up)
   }
 
-  private static var textures: [String: CGImage] = [:]
+  private static let textureLock = NSLock()
+  nonisolated(unsafe) private static var textures: [String: CGImage] = [:]
 
   /// Loose pencil hatching: broken strokes with varied weight, spacing and pressure.
   private static func hatchTexture(size: CGSize, angle: CGFloat, spacing: CGFloat, seed: UInt64) -> CGImage {
     let key = "\(Int(size.width))x\(Int(size.height))-\(angle)-\(seed)"
-    if let hit = textures[key] { return hit }
+    if let hit = textureLock.withLock({ textures[key] }) { return hit }
     let format = UIGraphicsImageRendererFormat()
     format.scale = 1
     format.opaque = false
@@ -367,24 +383,156 @@ enum SketchFilter {
       }
     }
     let cgImage = image.cgImage!
-    textures[key] = cgImage
+    textureLock.withLock { textures[key] = cgImage }
     return cgImage
   }
+}
+
+struct CoverImages {
+  let color: UIImage
+  let sketch: UIImage
+}
+
+/// Pixel size of a loaded server cover and its sketch.
+enum CoverResolution: Int {
+  /// Grids, shelves and rows.
+  case small = 360
+  /// The player, book detail and Home's Continue Listening cover.
+  case large = 960
 }
 
 @MainActor
 final class CoverStore {
   static let shared = CoverStore()
-  private var cache: [CoverSpec: (color: UIImage, sketch: UIImage)] = [:]
+  private var drawn: [CoverSpec: CoverImages] = [:]
+  private let remote = NSCache<NSString, Entry>()
+  private var loading: [String: Task<CoverImages?, Never>] = [:]
+  private let sketches = SketchWorker()
 
-  func images(for spec: CoverSpec) -> (color: UIImage, sketch: UIImage) {
-    if let hit = cache[spec] { return hit }
+  private final class Entry {
+    let images: CoverImages
+    init(_ images: CoverImages) { self.images = images }
+  }
+
+  init() {
+    remote.totalCostLimit = 160 * 1024 * 1024
+  }
+
+  func images(for spec: CoverSpec) -> CoverImages {
+    if let hit = drawn[spec] { return hit }
     let renderer = ImageRenderer(content: CoverArtwork(spec: spec).frame(width: 300, height: 300))
     renderer.scale = 2
     let color = renderer.uiImage ?? UIImage()
-    let sketch = SketchFilter.sketch(color) ?? color
-    cache[spec] = (color, sketch)
-    return (color, sketch)
+    let images = CoverImages(color: color, sketch: SketchFilter.sketch(color) ?? color)
+    drawn[spec] = images
+    return images
+  }
+
+  func cachedImages(for url: URL, resolution: CoverResolution) -> CoverImages? {
+    remote.object(forKey: Self.key(url, resolution) as NSString)?.images
+  }
+
+  /// The server cover, squared, and its sketch. Nil when the cover can't be loaded.
+  func images(for url: URL, resolution: CoverResolution) async -> CoverImages? {
+    let key = Self.key(url, resolution)
+    if let hit = remote.object(forKey: key as NSString) { return hit.images }
+    if let running = loading[key] { return await running.value }
+    let sketches = sketches
+    let task = Task<CoverImages?, Never> {
+      guard let color = await Self.loadSquare(url, side: resolution.rawValue) else { return nil }
+      let sketch = await sketches.sketch(color, key: key) ?? color
+      return CoverImages(color: color, sketch: sketch)
+    }
+    loading[key] = task
+    let result = await task.value
+    loading[key] = nil
+    if let result {
+      let side = resolution.rawValue
+      remote.setObject(Entry(result), forKey: key as NSString, cost: side * side * 8)
+    }
+    return result
+  }
+
+  private static func key(_ url: URL, _ resolution: CoverResolution) -> String {
+    "\(resolution.rawValue):\(url.absoluteString)"
+  }
+
+  nonisolated private static func loadSquare(_ url: URL, side: Int) async -> UIImage? {
+    let request = ImageRequest(
+      url: url,
+      processors: [ImageProcessors.Anonymous(id: "siren-square-\(side)") { $0.sirenSquared(side: CGFloat(side)) }]
+    )
+    return try? await ImagePipeline.shared.image(for: request)
+  }
+}
+
+/// Makes sketches one at a time, off the main thread, and keeps them on disk between launches.
+actor SketchWorker {
+  private let directory: URL? = {
+    guard let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else { return nil }
+    let url = caches.appendingPathComponent("SirenSketches", isDirectory: true)
+    try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    return url
+  }()
+
+  func sketch(_ image: UIImage, key: String) -> UIImage? {
+    let file = directory?.appendingPathComponent(Self.fileName(key))
+    if let file, let data = try? Data(contentsOf: file), let cached = UIImage(data: data) {
+      return cached
+    }
+    guard let sketch = SketchFilter.sketch(image) else { return nil }
+    if let file, let data = sketch.jpegData(compressionQuality: 0.85) {
+      try? data.write(to: file, options: .atomic)
+    }
+    return sketch
+  }
+
+  private static func fileName(_ key: String) -> String {
+    SHA256.hash(data: Data(key.utf8)).map { String(format: "%02x", $0) }.joined() + ".jpg"
+  }
+}
+
+extension UIImage {
+  /// Square at `side` pixels. Near-square covers are cropped; others sit on a soft blur of themselves.
+  nonisolated fileprivate func sirenSquared(side: CGFloat) -> UIImage {
+    let target = CGSize(width: side, height: side)
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = 1
+    format.opaque = true
+    let ratio = size.width / max(size.height, 1)
+    return UIGraphicsImageRenderer(size: target, format: format).image { context in
+      if (0.9...1.1).contains(ratio) {
+        draw(in: Self.fill(size, in: target))
+        return
+      }
+      // A 12 px copy scaled up makes the backdrop blur.
+      let tiny = UIGraphicsImageRenderer(size: CGSize(width: 12, height: 12), format: format).image { _ in
+        draw(in: Self.fill(size, in: CGSize(width: 12, height: 12)))
+      }
+      context.cgContext.interpolationQuality = .high
+      tiny.draw(in: CGRect(origin: .zero, size: target))
+      let scale = min(side / size.width, side / size.height)
+      let fitted = CGSize(width: size.width * scale, height: size.height * scale)
+      draw(
+        in: CGRect(
+          x: (side - fitted.width) / 2,
+          y: (side - fitted.height) / 2,
+          width: fitted.width,
+          height: fitted.height
+        )
+      )
+    }
+  }
+
+  nonisolated private static func fill(_ size: CGSize, in target: CGSize) -> CGRect {
+    let scale = max(target.width / size.width, target.height / size.height)
+    let filled = CGSize(width: size.width * scale, height: size.height * scale)
+    return CGRect(
+      x: (target.width - filled.width) / 2,
+      y: (target.height - filled.height) / 2,
+      width: filled.width,
+      height: filled.height
+    )
   }
 }
 
@@ -432,32 +580,59 @@ extension String {
 
 /// A book's cover with its listening progress inked in.
 struct RevealCover: View {
-  let book: DemoBook
+  let book: SirenBook
   var progress: Double?
   var showTicks = false
   var cornerRadius: CGFloat = SirenTheme.coverRadius
   var shadow = true
+  var resolution: CoverResolution = .small
+
+  @State private var loaded: (url: URL, images: CoverImages)?
+  @AppStorage(SirenSettings.artStyle) private var style: SirenArtStyleChoice = .coverReveal
 
   var body: some View {
-    let images = CoverStore.shared.images(for: book.cover)
-    let p = progress ?? book.progress
-    ZStack {
-      Image(uiImage: images.sketch).resizable()
-      Image(uiImage: images.color).resizable()
-        .mask(BrushedRevealMask(progress: p, seed: book.id.sirenSeed))
-      if showTicks {
-        ChapterTicks(starts: book.chapterStarts, current: book.currentChapter, progress: p)
+    // With progress art off, covers are just covers.
+    let p = style == .off ? 1 : progress ?? book.progress
+    Color.clear
+      .aspectRatio(1, contentMode: .fit)
+      .overlay {
+        if let images {
+          Image(uiImage: images.sketch).resizable()
+          Image(uiImage: images.color).resizable()
+            .mask(BrushedRevealMask(progress: p, seed: book.id.sirenSeed))
+        } else {
+          SirenTheme.paper
+        }
+        if showTicks {
+          ChapterTicks(starts: book.chapterStarts, current: book.currentChapter, progress: p)
+        }
       }
+      .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+      .overlay {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+          .strokeBorder(.black.opacity(0.08), lineWidth: 0.5)
+      }
+      .shadow(color: .black.opacity(shadow ? 0.18 : 0), radius: 4, y: 2)
+      .task(id: book.coverURL) { await load() }
+      .accessibilityElement(children: .ignore)
+      .accessibilityLabel("\(book.title) cover, \(Int((p * 100).rounded())) percent listened")
+  }
+
+  private var images: CoverImages? {
+    guard let url = book.coverURL else { return CoverStore.shared.images(for: book.cover) }
+    if let loaded, loaded.url == url { return loaded.images }
+    return CoverStore.shared.cachedImages(for: url, resolution: resolution)
+  }
+
+  private func load() async {
+    guard let url = book.coverURL, CoverStore.shared.cachedImages(for: url, resolution: resolution) == nil else {
+      return
     }
-    .aspectRatio(1, contentMode: .fit)
-    .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-    .overlay {
-      RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        .strokeBorder(.black.opacity(0.08), lineWidth: 0.5)
-    }
-    .shadow(color: .black.opacity(shadow ? 0.18 : 0), radius: 4, y: 2)
-    .accessibilityElement(children: .ignore)
-    .accessibilityLabel("\(book.title) cover, \(Int((p * 100).rounded())) percent listened")
+    let images =
+      await CoverStore.shared.images(for: url, resolution: resolution)
+      ?? CoverStore.shared.images(for: book.cover)
+    guard !Task.isCancelled else { return }
+    loaded = (url, images)
   }
 }
 

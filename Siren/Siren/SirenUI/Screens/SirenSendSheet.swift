@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Send a book to someone in the household. It lands on their Home under "From <sender>".
 struct SirenSendSheet: View {
-  let book: DemoBook
+  let book: SirenBook
 
   @Environment(\.dismiss) private var dismiss
   @State private var recipients: Set<String> = [Demo.sarah.id]
