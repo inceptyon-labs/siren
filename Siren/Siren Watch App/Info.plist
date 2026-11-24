@@ -29,7 +29,7 @@
 		<true/>
 	</dict>
 	<key>CFBundleDisplayName</key>
-	<string>Siren</string>
+	<string>Siren Books</string>
 	<key>WKCompanionAppBundleIdentifier</key>
 	<string>$(ORG_IDENTIFIER).siren</string>
 	<key>NSLocalNetworkUsageDescription</key>

@@ -8,7 +8,9 @@
 		<string>com.inceptyon.siren.dismiss-sleep-timer-activity</string>
 	</array>
 	<key>CFBundleDisplayName</key>
-	<string>Siren</string>
+	<string>Siren Books</string>
+	<key>CFBundleName</key>
+	<string>Siren Books</string>
 	<key>CFBundleGetInfoString</key>
 	<string></string>
 	<key>CFBundleURLTypes</key>
@@ -26,6 +28,12 @@
 	</array>
 	<key>INAlternativeAppNames</key>
 	<array>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>Siren</string>
+			<key>INAlternativeAppNamePronunciationHint</key>
+			<string>Siren</string>
+		</dict>
 		<dict>
 			<key>INAlternativeAppName</key>
 			<string>Audiobook</string>

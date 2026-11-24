@@ -8,7 +8,7 @@
 		<true/>
 	</dict>
 	<key>CFBundleDisplayName</key>
-	<string>Siren</string>
+	<string>Siren Books</string>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionPointIdentifier</key>
