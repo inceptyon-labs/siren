@@ -1,0 +1,13 @@
+// Signing.xcconfig
+// Default signing configuration for Siren
+//
+// Maintainer: These defaults are used automatically.
+// Contributors: Copy Local.xcconfig.example to Local.xcconfig and update
+//               with your settings.
+
+// SIREN: Inceptyon Labs team and Siren identifiers
+DEVELOPMENT_TEAM = 3T877KDT79
+ORG_IDENTIFIER = com.inceptyon
+
+// Pull in local overrides if they exist (the ? makes the include optional)
+#include? "Local.xcconfig"

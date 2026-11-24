@@ -1,0 +1,22 @@
+repos:
+  - repo: local
+    hooks:
+      - id: swift-format
+        name: swift-format
+        entry: swift-format format --in-place --recursive --parallel
+        language: system
+        types: [swift]
+        require_serial: true
+
+      - id: swift-format-lint
+        name: swift-format-lint
+        entry: swift-format lint --strict --recursive --parallel
+        language: system
+        types: [swift]
+        require_serial: true
+
+      - id: gitleaks
+        name: gitleaks
+        entry: .githooks/gitleaks-staged
+        language: script
+        pass_filenames: false

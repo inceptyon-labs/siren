@@ -1,0 +1,29 @@
+.DS_Store
+/.build
+/Packages
+/*.xcodeproj
+xcuserdata/
+DerivedData/
+.swiftpm/config/registries.json
+.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+.netrc
+.swiftpm
+Package.resolved
+.build
+Debug
+Siren/Local.xcconfig
+__pycache__/
+
+# App Store Connect API key flags (copied from Ithaca)
+.asc.local
+/build/
+
+# Internal docs (kept local by repo-tidy)
+/docs/roadmap.md
+/PRODUCT.md
+/DESIGN.md
+/.impeccable/
+/design/logo/round2/
+/design/logo/[a-f]-*.png
+/design/logo/contact-sheet.png
+/design/logo/prompts.tsv
