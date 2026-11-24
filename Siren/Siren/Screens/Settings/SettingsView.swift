@@ -103,6 +103,13 @@ struct SettingsView: View {
             tint: .brown,
             title: "Privacy Policy"
           )
+          // SIREN: source link, for the MPL and AGPL
+          externalLink(
+            url: "https://github.com/inceptyon-labs/siren",
+            systemImage: "chevron.left.forwardslash.chevron.right",
+            tint: .gray,
+            title: "Source Code"
+          )
         } header: {
           Text("Legal")
         }
