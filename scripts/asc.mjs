@@ -4,7 +4,7 @@
 //   asc.mjs check
 //     Looks the app up by bundle ID and says whether the record exists. Exits 1 when it doesn't.
 //   asc.mjs testflight <build> <what-to-test.txt>
-//     Waits for the iOS build with this build number to finish processing, sets "What to Test" on it,
+//     Waits for the iOS build (tvOS with ASC_PLATFORMS=TV_OS) with this build number to finish processing, sets "What to Test" on it,
 //     and makes sure the internal group "Inceptyon" exists with every build, so internal testers get each new build.
 //   asc.mjs release <version> <build> <whats-new.txt>
 //     Finds or creates the version, attaches the build, sets What's New, and submits it for review,
@@ -17,7 +17,8 @@ import path from "node:path";
 
 const BUNDLE_ID = "com.inceptyon.siren";
 const GROUP = "Inceptyon";
-const PLATFORMS = ["IOS"];
+// ASC_PLATFORMS=TV_OS for the Apple TV build (scripts/testflight.sh --tv).
+const PLATFORMS = (process.env.ASC_PLATFORMS ?? "IOS").split(",");
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 
 function fail(message) {
