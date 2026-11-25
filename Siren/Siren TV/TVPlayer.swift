@@ -102,9 +102,11 @@ final class TVPlayer {
     defer { if current == generation { isLoading = false } }
     do {
       let session = try await Audiobookshelf.shared.sessions.start(itemID: itemID, sessionType: .tv, timeout: 30)
-      // Stopped, or switched to someone else, while it started.
-      guard current == generation, Audiobookshelf.shared.authentication.server?.id == server.id else {
-        try? await Audiobookshelf.shared.sessions.close(session.id)
+      // Stopped, or switched to someone else, while it started. Its session is closed only on its
+      // own server's sign-in; after a switch, Audiobookshelf times it out.
+      let sameServer = Audiobookshelf.shared.authentication.server?.id == server.id
+      guard current == generation, sameServer else {
+        if sameServer { try? await Audiobookshelf.shared.sessions.close(session.id) }
         return
       }
       guard case .book(let item) = session.libraryItem, let audio = session.audioTracks, !audio.isEmpty else {
@@ -151,7 +153,7 @@ final class TVPlayer {
     guard let book else { return }
     // After the last track, or a track that failed, the queue is rebuilt (from the start once
     // the book is finished).
-    if player.items().isEmpty || player.currentItem?.status == .failed {
+    if !tracks.isEmpty, player.items().isEmpty || player.currentItem?.status == .failed {
       error = nil
       load(at: time >= book.duration - 1 ? 0 : time, play: true)
       return
@@ -216,6 +218,7 @@ final class TVPlayer {
 
   /// Queues the tracks from the one holding `bookTime`, positioned there.
   private func load(at bookTime: Double, play: Bool) {
+    guard !tracks.isEmpty else { return }
     player.removeAllItems()
     trackOf = [:]
     let index = tracks.lastIndex { $0.start <= bookTime } ?? 0
