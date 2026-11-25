@@ -79,7 +79,9 @@ struct SirenLivePlayer: View {
     let now = model.playbackProgress.totalProgress * model.playbackProgress.total
     let current = source.files.lastIndex { $0.start <= now } ?? 0
     let files = source.files[current...] + source.files[..<current]
-    await SirenAudioScan.shared.scanAll(files.map(\.url))
+    await SirenAudioScan.shared.scanAll(
+      files.map { (url: $0.url, from: $0.url == source.files[current].url ? max(now - $0.start, 0) : 0) }
+    )
   }
 
   /// Bookmarks as fractions of the book, for the map's flags.

@@ -28,6 +28,8 @@ final class SirenAudioScan {
   private(set) var revision = 0
   @ObservationIgnored private var scans: [String: FileScan] = [:]
   @ObservationIgnored private var running: Set<String> = []
+  /// Cache files are written in order, so a later chunk's snapshot is never replaced by an earlier one.
+  @ObservationIgnored private let writer = DispatchQueue(label: "siren.audio-scan.writer", qos: .utility)
   @ObservationIgnored private let folder = URL.cachesDirectory.appending(
     path: "siren-scan",
     directoryHint: .isDirectory
@@ -58,12 +60,13 @@ final class SirenAudioScan {
     Task { await run(file, key: key, from: time) }
   }
 
-  /// Reads each file in turn, all of it, skipping ones read or being read.
-  func scanAll(_ files: [URL]) async {
+  /// Reads each file in turn, all of it, each from `from` seconds into it (then its start),
+  /// skipping ones read or being read.
+  func scanAll(_ files: [(url: URL, from: Double)]) async {
     for file in files {
       guard !Task.isCancelled else { return }
-      guard let key = Self.key(file), !running.contains(key), scan(key)?.isComplete != true else { continue }
-      await run(file, key: key, from: 0)
+      guard let key = Self.key(file.url), !running.contains(key), scan(key)?.isComplete != true else { continue }
+      await run(file.url, key: key, from: file.from)
     }
   }
 
@@ -118,7 +121,7 @@ final class SirenAudioScan {
     )
     guard reader.startReading() else { return nil }
 
-    var detector = SirenPauseDetector()
+    var detector = SirenPauseDetector(start: range.lowerBound)
     let block = Int(rate * SirenPauseDetector.block)
     var pending: [Float] = []
     var time = range.lowerBound
@@ -149,7 +152,7 @@ final class SirenAudioScan {
       pending.removeFirst(used)
     }
     guard reader.status == .completed else { return nil }
-    detector.finish(at: time)
+    detector.finish(at: time, atEdge: true)
     let loudness = bins.map {
       (bin: $0.key, level: 10 * log10(max(Float($0.value.sum / Double($0.value.count)), 1e-12)))
     }
@@ -173,7 +176,14 @@ final class SirenAudioScan {
         joined.append(pause)
       }
     }
-    scan.pauses = joined
+    // Short pieces are kept only at chunk edges, where the rest may be in a chunk not read yet.
+    func atEdge(_ time: Double) -> Bool {
+      abs(time - (time / Self.chunk).rounded() * Self.chunk) < SirenPauseDetector.block * 1.5
+    }
+    scan.pauses = joined.filter {
+      $0.upperBound - $0.lowerBound >= SirenPauseDetector.shortestPause || atEdge($0.lowerBound)
+        || atEdge($0.upperBound)
+    }
     let bins = Int((duration / Self.bin).rounded(.up))
     if scan.loudness.count != bins { scan.loudness = Array(repeating: nil, count: bins) }
     for (bin, level) in read.loudness where scan.loudness.indices.contains(bin) {
@@ -184,7 +194,7 @@ final class SirenAudioScan {
     let file = folder.appending(path: key + ".json")
     let folder = folder
     if let data = try? JSONEncoder().encode(scan) {
-      Task.detached(priority: .utility) {
+      writer.async {
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         try? data.write(to: file, options: .atomic)
       }
@@ -227,6 +237,12 @@ nonisolated struct SirenPauseDetector {
   private(set) var pauses: [Range<Double>] = []
   private var pauseStart: Double?
   private var speech: Float = -20
+  /// Where the read starts: a pause from there may continue before it.
+  private let start: Double
+
+  init(start: Double) {
+    self.start = start
+  }
 
   mutating func add(time: Double, meanSquare: Float, seconds: Double) {
     let level = 10 * log10(max(meanSquare, 1e-12))
@@ -239,8 +255,14 @@ nonisolated struct SirenPauseDetector {
     }
   }
 
-  mutating func finish(at time: Double) {
-    if let pauseStart, time - pauseStart >= Self.shortestPause { pauses.append(pauseStart..<time) }
+  /// Ends a pause at `time`. A short one is kept where it touches the edge of the read, since the
+  /// rest of it may be in the next chunk.
+  mutating func finish(at time: Double, atEdge: Bool = false) {
+    if let pauseStart, time > pauseStart,
+      time - pauseStart >= Self.shortestPause || atEdge || pauseStart <= start + Self.block / 2
+    {
+      pauses.append(pauseStart..<time)
+    }
     pauseStart = nil
   }
 }
