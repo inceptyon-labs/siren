@@ -93,7 +93,7 @@ final class SirenRecommendations {
     else { return }
 
     // From the server, not the local store: Home may not have synced it yet.
-    guard let progress = try? await Self.progress() else { return }
+    guard let progress = try? await MyProgress.books() else { return }
     let liked = (try? await Likes.playlist())?.items.map(\.libraryItemID) ?? []
     guard Self.currentKey == key else { return }
 
@@ -103,16 +103,6 @@ final class SirenRecommendations {
     guard Self.currentKey == key else { return }
     loadedKey = key
     loadedAt = Date()
-  }
-
-  nonisolated private struct Me: Decodable, Sendable {
-    let mediaProgress: [User.MediaProgress]
-  }
-
-  /// Your progress on every book (`GET /api/me`); podcast episodes left out.
-  private static func progress() async throws -> [User.MediaProgress] {
-    let me: Me = try await Audiobookshelf.shared.send("/api/me")
-    return me.mediaProgress.filter { $0.episodeId == nil }
   }
 
   // MARK: Because you liked

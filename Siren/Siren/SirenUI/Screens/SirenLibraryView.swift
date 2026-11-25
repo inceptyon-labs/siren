@@ -154,7 +154,7 @@ struct SirenLibraryCell: View {
 }
 
 enum SirenLibraryScope: CaseIterable, Identifiable {
-  case books, series, authors
+  case books, series, authors, playlists
 
   var id: Self { self }
 
@@ -163,6 +163,7 @@ enum SirenLibraryScope: CaseIterable, Identifiable {
     case .books: "Books"
     case .series: "Series"
     case .authors: "Authors"
+    case .playlists: "Playlists"
     }
   }
 
@@ -171,6 +172,7 @@ enum SirenLibraryScope: CaseIterable, Identifiable {
     case .books: "books.vertical"
     case .series: "square.stack"
     case .authors: "person.2"
+    case .playlists: "music.note.list"
     }
   }
 }

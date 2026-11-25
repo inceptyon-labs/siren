@@ -57,6 +57,7 @@ struct SirenLiveLibrary: View {
       case .books: booksGrid
       case .series: SirenSeriesGrid(model: series)
       case .authors: SirenAuthorList(model: authors)
+      case .playlists: SirenPlaylistsList()
       }
     }
     .safeAreaInset(edge: .top, spacing: 0) {

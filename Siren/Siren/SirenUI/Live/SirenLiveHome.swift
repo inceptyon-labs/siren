@@ -1,5 +1,6 @@
 import API
 import Models
+import SirenKit
 import SwiftUI
 
 /// Home bound to upstream's `HomePageModel`: Continue Listening, the yearly goal, then the
@@ -96,6 +97,7 @@ struct SirenLiveHome: View {
       sentRefresh += 1
       // Not awaited: a first run asks Audible about the whole library.
       Task { await SirenRecommendations.shared.refresh(force: true) }
+      Task { await SmartPlaylists.shared.syncSaved(force: true) }
       await model.refresh()
       await loadYear()
     }
@@ -105,6 +107,8 @@ struct SirenLiveHome: View {
     }
     .task(id: libraries.current?.id) { await loadYear() }
     .task(id: libraries.current?.id) { await SirenRecommendations.shared.refresh() }
+    // Saved smart playlists (and so a pinned one) follow the library.
+    .task(id: libraries.current?.id) { await SmartPlaylists.shared.syncSaved() }
     .task(id: heroKey) { await loadHeroDetail() }
     .onChange(of: libraries.current) { _, new in model.onReset(new != nil) }
     .onChange(of: preferences.homeSections) { _, _ in model.onPreferencesChanged() }

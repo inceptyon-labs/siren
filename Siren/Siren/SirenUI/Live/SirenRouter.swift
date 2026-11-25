@@ -47,6 +47,7 @@ extension View {
       case .progressArt: SirenProgressArtSettingsView()
       case .profiles: SirenProfilesView()
       case .requests: SirenRequestsSettingsView()
+      case .smartPlaylist(let id): SirenSmartPlaylistView(id: id)
       }
     }
   }
