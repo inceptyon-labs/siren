@@ -241,25 +241,26 @@ struct SirenBecauseYouLikedShelf: View {
   @State private var selected: AudibleProduct?
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 14) {
+    VStack(alignment: .leading, spacing: 0) {
       if let seed = recommendations.seedTitle, !recommendations.picks.isEmpty {
-        SirenSectionHeader(title: "Because you liked \(seed)")
-        ScrollView(.horizontal, showsIndicators: false) {
-          LazyHStack(alignment: .top, spacing: 14) {
-            ForEach(recommendations.picks) { product in
-              Button {
-                selected = product
-              } label: {
-                SirenRatedCard(
-                  book: SirenBook(audible: product),
-                  caption: requests.liveRequest(asin: product.asin) != nil ? "Requested" : nil
-                )
+        SirenHomeSection(title: "Because you liked \(seed)") {
+          ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(alignment: .top, spacing: 14) {
+              ForEach(recommendations.picks) { product in
+                Button {
+                  selected = product
+                } label: {
+                  SirenRatedCard(
+                    book: SirenBook(audible: product),
+                    caption: requests.liveRequest(asin: product.asin) != nil ? "Requested" : nil
+                  )
+                }
+                .buttonStyle(.plain)
               }
-              .buttonStyle(.plain)
             }
           }
+          .scrollClipDisabled()
         }
-        .scrollClipDisabled()
       }
     }
     .sirenRequestDialog(for: $selected, onConnect: onConnect)
@@ -275,23 +276,24 @@ struct SirenComingSoonShelf: View {
   @State private var selected: AudibleSeriesList.Book?
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 14) {
+    VStack(alignment: .leading, spacing: 0) {
       if !recommendations.upcoming.isEmpty {
-        SirenSectionHeader(title: "Coming Soon in Your Series")
-        ScrollView(.horizontal, showsIndicators: false) {
-          LazyHStack(alignment: .top, spacing: 14) {
-            ForEach(recommendations.upcoming) { upcoming in
-              Button {
-                selected = upcoming.book
-              } label: {
-                SirenRatedCard(book: SirenBook(audible: upcoming.book.product), caption: caption(upcoming.book))
+        SirenHomeSection(title: "Coming Soon in Your Series") {
+          ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(alignment: .top, spacing: 14) {
+              ForEach(recommendations.upcoming) { upcoming in
+                Button {
+                  selected = upcoming.book
+                } label: {
+                  SirenRatedCard(book: SirenBook(audible: upcoming.book.product), caption: caption(upcoming.book))
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(Text(upcoming.series))
               }
-              .buttonStyle(.plain)
-              .accessibilityHint(Text(upcoming.series))
             }
           }
+          .scrollClipDisabled()
         }
-        .scrollClipDisabled()
       }
     }
     .sirenRequestDialog(
@@ -314,22 +316,23 @@ struct SirenHighlyRatedShelf: View {
   @State private var recommendations = SirenRecommendations.shared
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 14) {
+    VStack(alignment: .leading, spacing: 0) {
       if !recommendations.unstarted.isEmpty {
-        SirenSectionHeader(title: "Highly Rated in Your Library")
-        ScrollView(.horizontal, showsIndicators: false) {
-          LazyHStack(alignment: .top, spacing: 14) {
-            ForEach(recommendations.unstarted) { book in
-              Button {
-                onOpen(book)
-              } label: {
-                SirenRatedCard(book: book)
+        SirenHomeSection(title: "Highly Rated in Your Library") {
+          ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(alignment: .top, spacing: 14) {
+              ForEach(recommendations.unstarted) { book in
+                Button {
+                  onOpen(book)
+                } label: {
+                  SirenRatedCard(book: book)
+                }
+                .buttonStyle(.plain)
               }
-              .buttonStyle(.plain)
             }
           }
+          .scrollClipDisabled()
         }
-        .scrollClipDisabled()
       }
     }
   }

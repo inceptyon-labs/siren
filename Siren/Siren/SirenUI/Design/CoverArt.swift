@@ -280,18 +280,26 @@ struct CoverArtwork: View {
 }
 
 /// Graphite pencil sketch of any cover image, made on the device with Core Image and Core Graphics.
-/// Every layer sits on opaque paper, so the sketch looks the same on light and dark screens.
+/// Every layer sits on opaque paper, so the sketch looks the same on light and dark screens. With
+/// `wash`, the paper carries a faint wash of the cover's own colours.
 enum SketchFilter {
   private static let context = CIContext(options: [.cacheIntermediates: false])
   static let paperColor = CIColor(red: 236 / 255, green: 234 / 255, blue: 228 / 255)
   private static let graphite = CIColor(red: 0.33, green: 0.345, blue: 0.37)
 
-  static func sketch(_ image: UIImage) -> UIImage? {
+  static func sketch(_ image: UIImage, wash: Bool = false) -> UIImage? {
     guard let cg = image.cgImage else { return nil }
     let input = CIImage(cgImage: cg)
     let extent = input.extent
     let mono = input.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0])
-    let paper = CIImage(color: paperColor).cropped(to: extent)
+    let plainPaper = CIImage(color: paperColor).cropped(to: extent)
+    let paper =
+      wash
+      ? input
+        .applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0.75])
+        .applyingFilter("CIColorMatrix", parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0.5)])
+        .composited(over: plainPaper)
+      : plainPaper
 
     // Tone: how dark each region is. Mid-tones get one hatch layer, the darkest get a second.
     let darkness = mono.applyingFilter("CIColorInvert")
@@ -404,10 +412,15 @@ enum CoverResolution: Int {
 @MainActor
 final class CoverStore {
   static let shared = CoverStore()
-  private var drawn: [CoverSpec: CoverImages] = [:]
+  private var drawn: [DrawnKey: CoverImages] = [:]
   private let remote = NSCache<NSString, Entry>()
   private var loading: [String: Task<CoverImages?, Never>] = [:]
   private let sketches = SketchWorker()
+
+  private struct DrawnKey: Hashable {
+    let spec: CoverSpec
+    let wash: Bool
+  }
 
   private final class Entry {
     let images: CoverImages
@@ -418,29 +431,30 @@ final class CoverStore {
     remote.totalCostLimit = 160 * 1024 * 1024
   }
 
-  func images(for spec: CoverSpec) -> CoverImages {
-    if let hit = drawn[spec] { return hit }
+  func images(for spec: CoverSpec, wash: Bool = false) -> CoverImages {
+    let key = DrawnKey(spec: spec, wash: wash)
+    if let hit = drawn[key] { return hit }
     let renderer = ImageRenderer(content: CoverArtwork(spec: spec).frame(width: 300, height: 300))
     renderer.scale = 2
     let color = renderer.uiImage ?? UIImage()
-    let images = CoverImages(color: color, sketch: SketchFilter.sketch(color) ?? color)
-    drawn[spec] = images
+    let images = CoverImages(color: color, sketch: SketchFilter.sketch(color, wash: wash) ?? color)
+    drawn[key] = images
     return images
   }
 
-  func cachedImages(for url: URL, resolution: CoverResolution) -> CoverImages? {
-    remote.object(forKey: Self.key(url, resolution) as NSString)?.images
+  func cachedImages(for url: URL, resolution: CoverResolution, wash: Bool = false) -> CoverImages? {
+    remote.object(forKey: Self.key(url, resolution, wash) as NSString)?.images
   }
 
   /// The server cover, squared, and its sketch. Nil when the cover can't be loaded.
-  func images(for url: URL, resolution: CoverResolution) async -> CoverImages? {
-    let key = Self.key(url, resolution)
+  func images(for url: URL, resolution: CoverResolution, wash: Bool = false) async -> CoverImages? {
+    let key = Self.key(url, resolution, wash)
     if let hit = remote.object(forKey: key as NSString) { return hit.images }
     if let running = loading[key] { return await running.value }
     let sketches = sketches
     let task = Task<CoverImages?, Never> {
       guard let color = await Self.loadSquare(url, side: resolution.rawValue) else { return nil }
-      let sketch = await sketches.sketch(color, key: key) ?? color
+      let sketch = await sketches.sketch(color, key: key, wash: wash) ?? color
       return CoverImages(color: color, sketch: sketch)
     }
     loading[key] = task
@@ -453,8 +467,8 @@ final class CoverStore {
     return result
   }
 
-  private static func key(_ url: URL, _ resolution: CoverResolution) -> String {
-    "\(resolution.rawValue):\(url.absoluteString)"
+  private static func key(_ url: URL, _ resolution: CoverResolution, _ wash: Bool) -> String {
+    "\(resolution.rawValue)\(wash ? "w" : ""):\(url.absoluteString)"
   }
 
   nonisolated private static func loadSquare(_ url: URL, side: Int) async -> UIImage? {
@@ -475,12 +489,12 @@ actor SketchWorker {
     return url
   }()
 
-  func sketch(_ image: UIImage, key: String) -> UIImage? {
+  func sketch(_ image: UIImage, key: String, wash: Bool) -> UIImage? {
     let file = directory?.appendingPathComponent(Self.fileName(key))
     if let file, let data = try? Data(contentsOf: file), let cached = UIImage(data: data) {
       return cached
     }
-    guard let sketch = SketchFilter.sketch(image) else { return nil }
+    guard let sketch = SketchFilter.sketch(image, wash: wash) else { return nil }
     if let file, let data = sketch.jpegData(compressionQuality: 0.85) {
       try? data.write(to: file, options: .atomic)
     }
@@ -586,9 +600,14 @@ struct RevealCover: View {
   var cornerRadius: CGFloat = SirenTheme.coverRadius
   var shadow = true
   var resolution: CoverResolution = .small
+  /// A colour wash under the sketch; nil follows the setting.
+  var wash: Bool?
 
-  @State private var loaded: (url: URL, images: CoverImages)?
+  @State private var loaded: (url: URL, wash: Bool, images: CoverImages)?
   @AppStorage(SirenSettings.coverReveal) private var revealsProgress = true
+  @AppStorage(SirenSettings.coverWash) private var washSetting = false
+
+  private var washes: Bool { wash ?? washSetting }
 
   var body: some View {
     // With the reveal off, covers are just covers.
@@ -613,26 +632,27 @@ struct RevealCover: View {
           .strokeBorder(.black.opacity(0.08), lineWidth: 0.5)
       }
       .shadow(color: .black.opacity(shadow ? 0.18 : 0), radius: 4, y: 2)
-      .task(id: book.coverURL) { await load() }
+      .task(id: "\(washes)|\(book.coverURL?.absoluteString ?? "")") { await load() }
       .accessibilityElement(children: .ignore)
       .accessibilityLabel("\(book.title) cover, \(Int((p * 100).rounded())) percent listened")
   }
 
   private var images: CoverImages? {
-    guard let url = book.coverURL else { return CoverStore.shared.images(for: book.cover) }
-    if let loaded, loaded.url == url { return loaded.images }
-    return CoverStore.shared.cachedImages(for: url, resolution: resolution)
+    guard let url = book.coverURL else { return CoverStore.shared.images(for: book.cover, wash: washes) }
+    if let loaded, loaded.url == url, loaded.wash == washes { return loaded.images }
+    return CoverStore.shared.cachedImages(for: url, resolution: resolution, wash: washes)
   }
 
   private func load() async {
-    guard let url = book.coverURL, CoverStore.shared.cachedImages(for: url, resolution: resolution) == nil else {
-      return
-    }
+    let wash = washes
+    guard let url = book.coverURL,
+      CoverStore.shared.cachedImages(for: url, resolution: resolution, wash: wash) == nil
+    else { return }
     let images =
-      await CoverStore.shared.images(for: url, resolution: resolution)
-      ?? CoverStore.shared.images(for: book.cover)
+      await CoverStore.shared.images(for: url, resolution: resolution, wash: wash)
+      ?? CoverStore.shared.images(for: book.cover, wash: wash)
     guard !Task.isCancelled else { return }
-    loaded = (url, images)
+    loaded = (url, wash, images)
   }
 }
 

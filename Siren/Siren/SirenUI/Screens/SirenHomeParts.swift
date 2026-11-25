@@ -1,5 +1,31 @@
 import SwiftUI
 
+/// One Home section: a hairline above it (not on the first), the title, then the content. The
+/// title sits close to its content and far from the section before, so each shelf reads as one.
+struct SirenHomeSection<Content: View>: View {
+  let title: String
+  var divided = true
+  @ViewBuilder var content: Content
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      if divided {
+        Rectangle()
+          .fill(SirenTheme.separator)
+          .frame(height: 0.5)
+          .padding(.bottom, 10)
+          .accessibilityHidden(true)
+      }
+      Text(title)
+        .font(.title2.bold())
+        .foregroundStyle(SirenTheme.ink)
+        .accessibilityAddTraits(.isHeader)
+      content
+    }
+    .padding(.top, divided ? 24 : 4)
+  }
+}
+
 /// Home's lead: the book you're in, half inked, with Resume.
 struct SirenContinueCard: View {
   let book: SirenBook

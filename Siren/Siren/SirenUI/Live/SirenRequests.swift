@@ -273,18 +273,19 @@ struct SirenRequestsShelf: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 14) {
+    VStack(alignment: .leading, spacing: 0) {
       if !shown.isEmpty {
-        SirenSectionHeader(title: "Requests")
-        VStack(spacing: 0) {
-          ForEach(Array(shown.enumerated()), id: \.element.id) { index, request in
-            row(request)
-            if index < shown.count - 1 {
-              Divider().padding(.leading, 68)
+        SirenHomeSection(title: "Requests") {
+          VStack(spacing: 0) {
+            ForEach(Array(shown.enumerated()), id: \.element.id) { index, request in
+              row(request)
+              if index < shown.count - 1 {
+                Divider().padding(.leading, 68)
+              }
             }
           }
+          .background(SirenTheme.raised, in: RoundedRectangle(cornerRadius: SirenTheme.rowRadius, style: .continuous))
         }
-        .background(SirenTheme.raised, in: RoundedRectangle(cornerRadius: SirenTheme.rowRadius, style: .continuous))
       }
     }
     // Also restarts when a request starts elsewhere (a recommendation), so its progress shows.

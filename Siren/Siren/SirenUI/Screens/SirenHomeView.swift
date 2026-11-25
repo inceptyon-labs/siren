@@ -14,39 +14,36 @@ struct SirenHomeView: View {
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 14) {
+      VStack(alignment: .leading, spacing: 0) {
         if sizeClass == .regular && !isSarah {
           HStack(alignment: .top, spacing: 28) {
-            VStack(alignment: .leading, spacing: 14) {
-              SirenSectionHeader(title: "Continue Listening")
+            SirenHomeSection(title: "Continue Listening", divided: false) {
               continueBlock
               householdRow
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            VStack(alignment: .leading, spacing: 14) {
-              SirenSectionHeader(title: "Your 2026")
+            SirenHomeSection(title: "Your 2026", divided: false) {
               SirenGoalCard(finished: Demo.finished2026, count: Demo.finished2026.count, goal: Demo.yearlyGoal)
             }
             .frame(maxWidth: 460)
           }
-          SirenSectionHeader(title: "Requests")
-          requests
+          SirenHomeSection(title: "Requests") { requests }
         } else if isSarah {
-          SirenSectionHeader(title: "Continue Listening")
-          continueBlock
-          SirenSectionHeader(title: "From Jason")
-          FromSenderShelf(sender: Demo.jason, books: Demo.sentToSarah)
+          SirenHomeSection(title: "Continue Listening", divided: false) { continueBlock }
+          SirenHomeSection(title: "From Jason") {
+            FromSenderShelf(sender: Demo.jason, books: Demo.sentToSarah)
+          }
           SirenGoalCard(finished: Array(Demo.finished2026.suffix(6)), count: 6, goal: 12)
+            .padding(.top, 24)
         } else {
-          SirenSectionHeader(title: "Continue Listening")
-          continueBlock
-          SirenGoalCard(finished: Demo.finished2026, count: Demo.finished2026.count, goal: Demo.yearlyGoal)
-          householdRow
-          SirenSectionHeader(title: "Requests")
-          requests
+          SirenHomeSection(title: "Continue Listening", divided: false) {
+            continueBlock
+            SirenGoalCard(finished: Demo.finished2026, count: Demo.finished2026.count, goal: Demo.yearlyGoal)
+            householdRow
+          }
+          SirenHomeSection(title: "Requests") { requests }
         }
-        SirenSectionHeader(title: "Because you liked \(current.title)")
-        recommendations
+        SirenHomeSection(title: "Because you liked \(current.title)") { recommendations }
       }
       .padding(.horizontal, 20)
       .padding(.bottom, 32)

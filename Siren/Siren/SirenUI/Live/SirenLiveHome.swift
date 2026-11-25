@@ -36,9 +36,11 @@ struct SirenLiveHome: View {
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 14) {
+      // Sections space themselves (SirenHomeSection), so an empty shelf takes no room.
+      VStack(alignment: .leading, spacing: 0) {
         if authentication.server?.status == .authenticationError {
           signedOutBanner
+            .padding(.bottom, 14)
         }
         if let error = model.error {
           Text(error)
@@ -47,23 +49,25 @@ struct SirenLiveHome: View {
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(.red.opacity(0.15), in: RoundedRectangle(cornerRadius: SirenTheme.rowRadius))
+            .padding(.bottom, 14)
         }
 
         if sizeClass == .regular {
           HStack(alignment: .top, spacing: 28) {
-            VStack(alignment: .leading, spacing: 14) { continueSection }
+            continueSection
               .frame(maxWidth: .infinity, alignment: .leading)
             if showGoal, year != nil {
-              VStack(alignment: .leading, spacing: 14) {
-                SirenSectionHeader(title: "Your \(String(Calendar.current.component(.year, from: .now)))")
+              SirenHomeSection(title: "Your \(String(Calendar.current.component(.year, from: .now)))", divided: false) {
                 goalCard
               }
               .frame(maxWidth: 460)
             }
           }
         } else {
-          continueSection
-          goalCard
+          VStack(alignment: .leading, spacing: 14) {
+            continueSection
+            goalCard
+          }
         }
 
         SirenRequestsShelf(refreshID: sentRefresh)
@@ -154,13 +158,14 @@ struct SirenLiveHome: View {
 
   @ViewBuilder private var continueSection: some View {
     if let hero {
-      SirenSectionHeader(title: "Continue Listening")
-      SirenContinueCard(
-        book: hero,
-        isPlaying: isPlaying(hero.id),
-        onOpen: { open(hero.id) },
-        onResume: { resume(hero.id) }
-      )
+      SirenHomeSection(title: "Continue Listening", divided: false) {
+        SirenContinueCard(
+          book: hero,
+          isPlaying: isPlaying(hero.id),
+          onOpen: { open(hero.id) },
+          onResume: { resume(hero.id) }
+        )
+      }
     } else if !model.isLoading, libraries.current != nil {
       emptyState
     }
@@ -265,29 +270,34 @@ struct SirenLiveHome: View {
   @ViewBuilder private func shelf(_ section: HomePage.Model.Section) -> some View {
     switch section.items {
     case .continueBooks(let items) where items.items.count > 1:
-      SirenSectionHeader(title: "Also Listening")
-      SirenCoverShelf(books: items.items.dropFirst().map(SirenBook.init(card:))) { open($0.id) }
+      SirenHomeSection(title: "Also Listening") {
+        SirenCoverShelf(books: items.items.dropFirst().map(SirenBook.init(card:))) { open($0.id) }
+      }
     case .books(let items) where !items.isEmpty:
-      SirenSectionHeader(title: section.title)
-      SirenCoverShelf(books: items.map(SirenBook.init(card:))) { open($0.id) }
+      SirenHomeSection(title: section.title) {
+        SirenCoverShelf(books: items.map(SirenBook.init(card:))) { open($0.id) }
+      }
     case .playlist(_, let items):
       let books = items.compactMap { item -> SirenBook? in
         if case .book(let card) = item { return SirenBook(card: card) }
         return nil
       }
       if !books.isEmpty {
-        SirenSectionHeader(title: section.title)
-        SirenCoverShelf(books: books) { open($0.id) }
+        SirenHomeSection(title: section.title) {
+          SirenCoverShelf(books: books) { open($0.id) }
+        }
       }
     case .series(let items) where !items.isEmpty:
-      SirenSectionHeader(title: section.title)
-      SirenCoverShelf(books: items.map(SirenBook.init(series:))) { book in
-        guard let libraryID = libraries.current?.id else { return }
-        router.homePath.append(NavigationDestination.series(id: book.id, name: book.title, libraryID: libraryID))
+      SirenHomeSection(title: section.title) {
+        SirenCoverShelf(books: items.map(SirenBook.init(series:))) { book in
+          guard let libraryID = libraries.current?.id else { return }
+          router.homePath.append(NavigationDestination.series(id: book.id, name: book.title, libraryID: libraryID))
+        }
       }
     case .authors(let items) where !items.isEmpty:
-      SirenSectionHeader(title: section.title)
-      authorRow(items)
+      SirenHomeSection(title: section.title) {
+        authorRow(items)
+      }
     default:
       EmptyView()
     }

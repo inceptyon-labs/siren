@@ -3,6 +3,7 @@ import SwiftUI
 
 struct SirenProgressArtSettingsView: View {
   @AppStorage(SirenSettings.coverReveal) private var revealsProgress = true
+  @AppStorage(SirenSettings.coverWash) private var washesCovers = false
   @AppStorage(SirenSettings.playerArt) private var playerArt: PlayerArt = .cover
   @AppStorage(SirenSettings.goalUnit) private var goalUnit: SirenGoalUnit = .books
   @AppStorage(SirenSettings.bookGoal) private var bookGoal = 20
@@ -18,10 +19,25 @@ struct SirenProgressArtSettingsView: View {
         } action: {
           revealsProgress = false
         }
-        choiceRow("Ink in as you listen", detail: "The sketch fills with colour", isSelected: revealsProgress) {
-          RevealCover(book: Demo.saltRoad, progress: 0.57)
+        choiceRow(
+          "Ink in as you listen",
+          detail: "The sketch fills with colour",
+          isSelected: revealsProgress && !washesCovers
+        ) {
+          RevealCover(book: Demo.saltRoad, progress: 0.57, wash: false)
         } action: {
           revealsProgress = true
+          washesCovers = false
+        }
+        choiceRow(
+          "Ink in over a colour wash",
+          detail: "The sketch keeps a hint of the cover",
+          isSelected: revealsProgress && washesCovers
+        ) {
+          RevealCover(book: Demo.saltRoad, progress: 0.57, wash: true)
+        } action: {
+          revealsProgress = true
+          washesCovers = true
         }
       } header: {
         Text("Covers")

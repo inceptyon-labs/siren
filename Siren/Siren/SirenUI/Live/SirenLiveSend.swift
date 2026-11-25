@@ -189,10 +189,11 @@ struct SirenSentShelf: View {
       let book = SirenBook(card: card)
       return book.isFinished ? nil : book
     }
-    VStack(alignment: .leading, spacing: 14) {
+    VStack(alignment: .leading, spacing: 0) {
       if !books.isEmpty {
-        SirenSectionHeader(title: "Sent to You")
-        SirenCoverShelf(books: books, onOpen: onOpen)
+        SirenHomeSection(title: "Sent to You") {
+          SirenCoverShelf(books: books, onOpen: onOpen)
+        }
       }
     }
     .task(id: refreshID) { await model.refresh() }
