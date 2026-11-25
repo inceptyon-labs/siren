@@ -50,6 +50,12 @@ struct TVNowPlaying: View {
       }
       progress(book)
         .padding(.top, 8)
+      if let error = player.error {
+        Text(error)
+          .font(.callout)
+          .foregroundStyle(SirenTheme.secondary)
+          .lineLimit(2)
+      }
       transport
         .padding(.top, 24)
         .focusSection()

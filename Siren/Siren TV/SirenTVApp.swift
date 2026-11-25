@@ -64,6 +64,7 @@ final class TVAccount {
   func switchTo(_ id: String) async throws {
     await TVPlayer.shared.stop()
     try Audiobookshelf.shared.authentication.switchToServer(id)
+    TVTopShelf.clear()
     await TVLibraryChoice.ensure()
     refresh()
   }

@@ -18,4 +18,10 @@ enum TVTopShelf {
     TopShelfSnapshot(items: items).save()
     TVTopShelfContentProvider.topShelfContentDidChange()
   }
+
+  /// Empties the Top Shelf, after a sign-out or before another profile's Home loads.
+  static func clear() {
+    TopShelfSnapshot(items: []).save()
+    TVTopShelfContentProvider.topShelfContentDidChange()
+  }
 }

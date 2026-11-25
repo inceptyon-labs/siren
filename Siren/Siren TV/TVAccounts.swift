@@ -72,6 +72,7 @@ struct TVProfiles: View {
     if server.id == account.serverID {
       await TVPlayer.shared.stop()
     }
+    if server.id == account.serverID { TVTopShelf.clear() }
     Audiobookshelf.shared.authentication.logout(serverID: server.id)
     if Audiobookshelf.shared.authentication.server == nil,
       let next = Audiobookshelf.shared.authentication.servers.keys.sorted().first

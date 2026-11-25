@@ -57,12 +57,22 @@ final class TVPlayer {
   @ObservationIgnored private var lastTick: Date?
   @ObservationIgnored private var lastSync = Date.distantPast
   @ObservationIgnored private var artwork: MPMediaItemArtwork?
+  /// Goes up with each start and stop, so a start that returns late is dropped.
+  @ObservationIgnored private var generation = 0
 
   private init() {
     player.automaticallyWaitsToMinimizeStalling = true
     timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 2), queue: .main) {
       [weak self] _ in
       MainActor.assumeIsolated { self?.tick() }
+    }
+    NotificationCenter.default.addObserver(
+      forName: AVPlayerItem.failedToPlayToEndTimeNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] notification in
+      let item = notification.object as? AVPlayerItem
+      MainActor.assumeIsolated { self?.itemFailed(item) }
     }
     NotificationCenter.default.addObserver(
       forName: AVPlayerItem.didPlayToEndTimeNotification,
@@ -80,16 +90,23 @@ final class TVPlayer {
   /// Starts the book where you left off, or brings up the one already playing.
   func play(itemID: String) async {
     isShowing = true
-    if book?.itemID == itemID {
+    if book?.itemID == itemID, sessionID != nil {
       if !isPlaying { resume() }
       return
     }
     await stop()
     guard let server = Audiobookshelf.shared.authentication.server else { return }
+    generation += 1
+    let current = generation
     isLoading = true
-    defer { isLoading = false }
+    defer { if current == generation { isLoading = false } }
     do {
       let session = try await Audiobookshelf.shared.sessions.start(itemID: itemID, sessionType: .tv, timeout: 30)
+      // Stopped, or switched to someone else, while it started.
+      guard current == generation, Audiobookshelf.shared.authentication.server?.id == server.id else {
+        try? await Audiobookshelf.shared.sessions.close(session.id)
+        return
+      }
       guard case .book(let item) = session.libraryItem, let audio = session.audioTracks, !audio.isEmpty else {
         throw TVPlayerError.nothingToPlay
       }
@@ -114,6 +131,7 @@ final class TVPlayer {
       load(at: session.currentTime, play: true)
       loadArtwork()
     } catch {
+      guard current == generation else { return }
       self.error = String(localized: "Couldn't play this book. \(error.localizedDescription)")
     }
   }
@@ -130,7 +148,14 @@ final class TVPlayer {
   }
 
   func resume() {
-    guard book != nil else { return }
+    guard let book else { return }
+    // After the last track, or a track that failed, the queue is rebuilt (from the start once
+    // the book is finished).
+    if player.items().isEmpty || player.currentItem?.status == .failed {
+      error = nil
+      load(at: time >= book.duration - 1 ? 0 : time, play: true)
+      return
+    }
     player.playImmediately(atRate: rate)
     isPlaying = true
     updateNowPlaying()
@@ -162,6 +187,8 @@ final class TVPlayer {
 
   /// Saves where you are and closes the session.
   func stop() async {
+    generation += 1
+    isLoading = false
     guard book != nil else { return }
     player.pause()
     isPlaying = false
@@ -212,6 +239,16 @@ final class TVPlayer {
     updateNowPlaying()
   }
 
+  /// A track that couldn't be fetched or decoded: say so, and Play tries again from here.
+  private func itemFailed(_ item: AVPlayerItem?) {
+    guard let item, trackOf[ObjectIdentifier(item)] != nil else { return }
+    player.pause()
+    isPlaying = false
+    let reason = item.error?.localizedDescription ?? ""
+    error = String(localized: "Playback stopped. \(reason)")
+    updateNowPlaying()
+  }
+
   /// The queue moves on by itself; after the last track the book is done.
   private func itemEnded(_ item: AVPlayerItem?) {
     guard let item, trackOf[ObjectIdentifier(item)] == tracks.count - 1 else { return }
@@ -230,6 +267,7 @@ final class TVPlayer {
     guard tracks.indices.contains(currentTrack) else { return }
     let seconds = item.currentTime().seconds
     if seconds.isFinite { time = tracks[currentTrack].start + seconds }
+    if item.status == .failed, error == nil { itemFailed(item) }
     if isPlaying, player.timeControlStatus == .paused, player.rate == 0 { isPlaying = false }
     if now.timeIntervalSince(lastSync) >= 15 { Task { await sync() } }
   }
