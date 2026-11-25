@@ -76,7 +76,7 @@ struct SirenTour: View {
     HStack(spacing: 8) {
       ForEach(Page.allCases, id: \.self) { dot in
         Circle()
-          .fill(dot == page ? SirenTheme.tint : SirenTheme.secondary.opacity(0.3))
+          .fill(dot == page ? SirenTheme.tint : SirenTheme.secondary.opacity(0.45))
           .frame(width: 7, height: 7)
       }
     }
