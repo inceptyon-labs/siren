@@ -33,6 +33,8 @@ final class AudioPlayer {
   // SIREN: voice boost runs on the equalizer's tap, with or without the equalizer
   private var voiceBoost = false
   private var needsTap: Bool { eqEnabled || voiceBoost }
+  // SIREN: trim silence
+  private lazy var trimmer = SirenTrimSilence(player: player)
   private let mediaProgress: MediaProgress
   private var session: PlaybackSession
   private var tracks: [Track] = []
@@ -101,6 +103,8 @@ final class AudioPlayer {
     setupObservers()
     // SIREN: voice boost follows its setting
     SirenVoiceBoost.changes.sink { [weak self] in self?.setVoiceBoost($0) }.store(in: &cancellables)
+    // SIREN: trim silence follows its setting
+    SirenTrimSilence.changes.sink { [weak self] in self?.trimmer.setEnabled($0) }.store(in: &cancellables)
   }
 
   deinit {
@@ -185,6 +189,8 @@ final class AudioPlayer {
   }
 
   func seek(to time: TimeInterval) {
+    // SIREN: trim silence doesn't jump over your seek
+    trimmer.hold()
     mediaProgress.currentTime = time
     pendingSeekTarget = time
 

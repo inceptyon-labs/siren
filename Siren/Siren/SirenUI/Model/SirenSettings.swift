@@ -24,4 +24,8 @@ enum SirenSettings {
   static let minimumRating = "siren.library.minimumRating"
   /// Voice boost on the player: less rumble, clearer words, an even level.
   static let voiceBoost = "siren.player.voiceBoost"
+  /// Trim silence on the player (downloaded books).
+  static let trimSilence = "siren.player.trimSilence"
+  /// Listening time trim silence has saved, in seconds.
+  static let trimSilenceSaved = "siren.player.trimSilenceSaved"
 }

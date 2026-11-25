@@ -10,6 +10,8 @@ struct SirenLivePlayer: View {
   @ObservedObject private var preferences = UserPreferences.shared
   @AppStorage(SirenSettings.playerArt) private var playerArt: PlayerArt = .cover
   @AppStorage(SirenSettings.voiceBoost) private var voiceBoost = false
+  @AppStorage(SirenSettings.trimSilence) private var trimSilence = false
+  @AppStorage(SirenSettings.trimSilenceSaved) private var trimSaved = 0.0
   @State private var art: PlayerArt = .cover
   @State private var showingSend = false
   @ObservedObject private var authentication = Audiobookshelf.shared.authentication
@@ -51,6 +53,13 @@ struct SirenLivePlayer: View {
     SirenPlayback(player: model, preferences: preferences)
   }
 
+  /// Trim silence only works on downloaded books; once it has saved a minute, it says how much.
+  private var trimLabel: String {
+    guard trimSaved >= 60 else { return String(localized: "Downloaded books") }
+    let saved = Duration.seconds(trimSaved).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated))
+    return String(localized: "Saved \(saved)")
+  }
+
   @ViewBuilder private var moreMenu: some View {
     if model.podcastID == nil {
       Button("Go to Book", systemImage: "book") { onGoToBook(model.id) }
@@ -66,6 +75,14 @@ struct SirenLivePlayer: View {
     Button("Volume", systemImage: "speaker.wave.2") { model.volume.isPresented = true }
     Button("Equalizer", systemImage: "slider.vertical.3") { model.equalizer.isPresented = true }
     Toggle("Voice Boost", systemImage: "person.wave.2", isOn: $voiceBoost)
+    Toggle(isOn: $trimSilence) {
+      Label {
+        Text("Trim Silence")
+        Text(trimLabel)
+      } icon: {
+        Image(systemName: "waveform.badge.minus")
+      }
+    }
     Button("Player Settings", systemImage: "gearshape") { model.isSettingsPresented = true }
   }
 }
