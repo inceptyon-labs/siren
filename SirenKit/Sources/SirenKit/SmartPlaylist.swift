@@ -70,20 +70,29 @@ extension SmartPlaylist {
   /// The books that match every rule, sorted and limited.
   public func books(from library: [Book], context: Context) -> [Book] {
     let matching = library.filter { book in rules.allSatisfy { $0.matches(book, context) } }
+    // Ties fall back to the book ID, so a limit cuts the same books every time.
+    func ordered(_ key: (Book) -> Double, descending: Bool) -> [Book] {
+      matching.sorted { lhs, rhs in
+        let (left, right) = (key(lhs), key(rhs))
+        if left != right { return descending ? left > right : left < right }
+        return lhs.id < rhs.id
+      }
+    }
     let sorted: [Book]
     switch sort {
     case .recentlyAdded:
-      sorted = matching.sorted { $0.addedAt > $1.addedAt }
+      sorted = ordered({ $0.addedAt.timeIntervalSince1970 }, descending: true)
     case .rating:
-      sorted = matching.sorted { Self.rating($0, context) > Self.rating($1, context) }
+      sorted = ordered({ Self.rating($0, context) }, descending: true)
     case .title:
-      sorted = matching.sorted {
-        $0.titleIgnorePrefix.localizedStandardCompare($1.titleIgnorePrefix) == .orderedAscending
+      sorted = matching.sorted { lhs, rhs in
+        let order = lhs.titleIgnorePrefix.localizedStandardCompare(rhs.titleIgnorePrefix)
+        return order == .orderedSame ? lhs.id < rhs.id : order == .orderedAscending
       }
     case .shortest:
-      sorted = matching.sorted { $0.duration < $1.duration }
+      sorted = ordered({ $0.duration }, descending: false)
     case .longest:
-      sorted = matching.sorted { $0.duration > $1.duration }
+      sorted = ordered({ $0.duration }, descending: true)
     }
     return limit.map { Array(sorted.prefix($0)) } ?? sorted
   }
@@ -95,24 +104,48 @@ extension SmartPlaylist {
   /// One rule Audiobookshelf can apply itself, to fetch fewer books: the most selective there is.
   /// The device still checks every rule. Authors and series filter by ID, from `filterData`.
   public func serverFilter(_ filterData: FilterData?) -> String? {
+    // Without the library's own names the server can't be asked: it matches exact case.
+    guard let filterData else { return nil }
+    /// Base64 in the URL-safe alphabet without padding: a "+" in a query reads as a space, and
+    /// Audiobookshelf's decoder (Node's) takes either alphabet.
     func encoded(_ group: String, _ value: String) -> String {
-      "\(group).\(Data(value.utf8).base64EncodedString())"
+      let base64 = Data(value.utf8).base64EncodedString()
+        .replacingOccurrences(of: "+", with: "-")
+        .replacingOccurrences(of: "/", with: "_")
+        .replacingOccurrences(of: "=", with: "")
+      return "\(group).\(base64)"
+    }
+    /// The library's spelling of a name, matched ignoring case.
+    func canonical(_ name: String, in names: [String]) -> String? {
+      names.first { $0.caseInsensitiveCompare(name) == .orderedSame }
     }
     let order: [(Rule) -> String?] = [
       { rule in
         guard case .series(let name) = rule else { return nil }
-        return filterData?.series.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
+        return filterData.series.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
           .map { encoded("series", $0.id) }
       },
       { rule in
         guard case .author(let name) = rule else { return nil }
-        return filterData?.authors.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
+        return filterData.authors.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
           .map { encoded("authors", $0.id) }
       },
-      { if case .narrator(let name) = $0 { encoded("narrators", name) } else { nil } },
-      { if case .tag(let name) = $0 { encoded("tags", name) } else { nil } },
-      { if case .genre(let name) = $0 { encoded("genres", name) } else { nil } },
-      { if case .language(let name) = $0 { encoded("languages", name) } else { nil } },
+      { rule in
+        guard case .narrator(let name) = rule else { return nil }
+        return canonical(name, in: filterData.narrators).map { encoded("narrators", $0) }
+      },
+      { rule in
+        guard case .tag(let name) = rule else { return nil }
+        return canonical(name, in: filterData.tags).map { encoded("tags", $0) }
+      },
+      { rule in
+        guard case .genre(let name) = rule else { return nil }
+        return canonical(name, in: filterData.genres).map { encoded("genres", $0) }
+      },
+      { rule in
+        guard case .language(let name) = rule else { return nil }
+        return canonical(name, in: filterData.languages).map { encoded("languages", $0) }
+      },
     ]
     for pick in order {
       if let filter = rules.lazy.compactMap(pick).first { return filter }
@@ -134,11 +167,13 @@ extension SmartPlaylist.Rule {
     case .narrator(let name):
       return Self.names(metadata.narratorName).contains { $0.caseInsensitiveCompare(name) == .orderedSame }
     case .series(let name):
-      // "Name #1, Other #2", searched rather than split: a series name can contain ", ".
+      // "Name #1, Other #2", searched rather than split (a series name can contain ", "), and
+      // only where an entry starts, so "Dune" isn't "Children of Dune".
       let joined = (metadata.seriesName ?? "").lowercased()
       let name = name.lowercased()
-      return joined.contains("\(name) #") || joined == name || joined.hasPrefix("\(name), ")
-        || joined.hasSuffix(", \(name)") || joined.contains(", \(name), ")
+      guard !name.isEmpty else { return false }
+      return [name + " #", name + ", "].contains { joined.hasPrefix($0) || joined.contains(", " + $0) }
+        || joined == name || joined.hasSuffix(", " + name)
     case .progress(let state):
       let progress = context.progress[book.id]
       switch state {
@@ -147,8 +182,9 @@ extension SmartPlaylist.Rule {
       case .finished: return progress?.isFinished == true
       }
     case .length(let atLeast, let atMost):
+      // Books with no audio length (ebooks) aren't "under 3 hours".
       let hours = book.duration / 3600
-      return hours >= (atLeast ?? 0) && hours <= (atMost ?? .infinity)
+      return book.duration > 0 && hours >= (atLeast ?? 0) && hours <= (atMost ?? .infinity)
     case .rating(let atLeast):
       // As Audible shows it: 4.46 reads as 4.5.
       return (SmartPlaylist.rating(book, context) * 10).rounded() / 10 >= atLeast

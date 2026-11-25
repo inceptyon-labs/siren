@@ -87,6 +87,8 @@ struct SirenSmartPlaylistView: View {
   @State private var editing: SmartPlaylist?
   @State private var confirmsDelete = false
   @State private var isSaving = false
+  /// Bumped by every load, so an older one (a refresh, say) can't land over a newer one.
+  @State private var generation = 0
 
   private static let columns = [GridItem(.adaptive(minimum: 100, maximum: 170), spacing: 14, alignment: .top)]
 
@@ -195,14 +197,16 @@ struct SirenSmartPlaylistView: View {
   }
 
   private func load(_ playlist: SmartPlaylist) async {
+    generation += 1
+    let current = generation
     isLoading = true
     do {
       let books = try await store.books(for: playlist)
-      guard !Task.isCancelled else { return }
+      guard generation == current else { return }
       found = books
       error = nil
     } catch {
-      guard !Task.isCancelled else { return }
+      guard generation == current else { return }
       self.error = error.localizedDescription
     }
     isLoading = false
@@ -213,7 +217,7 @@ struct SirenSmartPlaylistView: View {
     Task {
       defer { isSaving = false }
       do {
-        let savedID = try await store.saveToServer(playlist, books: found)
+        let savedID = try await store.saveToServer(playlist)
         if pin {
           pinned.pin(savedID)
           Toast(success: "Pinned to Home").show()
@@ -295,7 +299,7 @@ struct SirenSmartPlaylistEditor: View {
             SmartPlaylists.shared.save(draft)
             dismiss()
           }
-          .disabled(draft.name.trimmingCharacters(in: .whitespaces).isEmpty)
+          .disabled(draft.name.trimmingCharacters(in: .whitespaces).isEmpty || rules.contains { $0.rule.isBlank })
         }
       }
       .task {
@@ -445,6 +449,16 @@ extension SmartPlaylist {
 }
 
 extension SmartPlaylist.Rule {
+  /// A name rule with no name yet: it would match nothing.
+  var isBlank: Bool {
+    switch self {
+    case .genre(let name), .tag(let name), .author(let name), .narrator(let name), .series(let name),
+      .language(let name):
+      name.trimmingCharacters(in: .whitespaces).isEmpty
+    default: false
+    }
+  }
+
   var summary: String {
     switch self {
     case .genre(let name), .tag(let name): return name
