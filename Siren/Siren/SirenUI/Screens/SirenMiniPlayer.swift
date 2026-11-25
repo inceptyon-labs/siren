@@ -48,6 +48,8 @@ struct SirenMiniPlayer: View {
     .foregroundStyle(SirenTheme.ink)
     .padding(.leading, 10)
     .padding(.trailing, 4)
+    // The bar has a fixed height, like the tab bar under it; larger text lives in the player.
+    .dynamicTypeSize(...DynamicTypeSize.xxLarge)
     .contentShape(Rectangle())
     .onTapGesture(perform: onOpen)
   }

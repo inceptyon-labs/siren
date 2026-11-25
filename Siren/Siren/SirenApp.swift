@@ -19,9 +19,9 @@ struct SirenApp: App {
         .displayScaled()
         .tint(preferences.accentColor)
         .preferredColorScheme(preferences.colorScheme.colorScheme)
-        .environment(\.appTheme, preferences.appTheme)
+        .environment(\.appTheme, .siren)  // SIREN: one look
         .onChange(of: preferences.accentColor, initial: true) {
-          updateWindowTintColor(preferences.accentColor)
+          updateWindowTintColor(SirenTheme.tint)  // SIREN: one look
           syncAccentColorToWidget(preferences.accentColor)
         }
         .onChange(of: preferences.colorScheme, initial: true) {

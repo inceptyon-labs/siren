@@ -10,6 +10,7 @@ struct SirenLiveHome: View {
   @ObservedObject private var authentication = Audiobookshelf.shared.authentication
   @ObservedObject private var libraries = Audiobookshelf.shared.libraries
   @ObservedObject private var preferences = UserPreferences.shared
+  @Environment(\.horizontalSizeClass) private var sizeClass
 
   @AppStorage(SirenSettings.goalUnit) private var goalUnit: SirenGoalUnit = .books
   @AppStorage(SirenSettings.bookGoal) private var bookGoal = 20
@@ -40,27 +41,21 @@ struct SirenLiveHome: View {
             .background(.red.opacity(0.15), in: RoundedRectangle(cornerRadius: SirenTheme.rowRadius))
         }
 
-        if let hero {
-          SirenSectionHeader(title: "Continue Listening")
-          SirenContinueCard(
-            book: hero,
-            isPlaying: isPlaying(hero.id),
-            onOpen: { open(hero.id) },
-            onResume: { resume(hero.id) }
-          )
-        } else if !model.isLoading, libraries.current != nil {
-          emptyState
-        }
-
-        if showGoal, let year {
-          SirenGoalCard(
-            finished: year.finished,
-            count: goalUnit == .books ? year.booksFinished : year.hoursListened,
-            goal: goalUnit == .books ? bookGoal : hourGoal,
-            unit: goalUnit == .books ? .books : .hours
-          )
-          .onTapGesture { router.homePath.append(NavigationDestination.stats) }
-          .accessibilityAddTraits(.isButton)
+        if sizeClass == .regular {
+          HStack(alignment: .top, spacing: 28) {
+            VStack(alignment: .leading, spacing: 14) { continueSection }
+              .frame(maxWidth: .infinity, alignment: .leading)
+            if showGoal, year != nil {
+              VStack(alignment: .leading, spacing: 14) {
+                SirenSectionHeader(title: "Your \(String(Calendar.current.component(.year, from: .now)))")
+                goalCard
+              }
+              .frame(maxWidth: 460)
+            }
+          }
+        } else {
+          continueSection
+          goalCard
         }
 
         ForEach(model.sections, id: \.id) { section in
@@ -98,6 +93,33 @@ struct SirenLiveHome: View {
   }
 
   // MARK: Continue Listening
+
+  @ViewBuilder private var continueSection: some View {
+    if let hero {
+      SirenSectionHeader(title: "Continue Listening")
+      SirenContinueCard(
+        book: hero,
+        isPlaying: isPlaying(hero.id),
+        onOpen: { open(hero.id) },
+        onResume: { resume(hero.id) }
+      )
+    } else if !model.isLoading, libraries.current != nil {
+      emptyState
+    }
+  }
+
+  @ViewBuilder private var goalCard: some View {
+    if showGoal, let year {
+      SirenGoalCard(
+        finished: year.finished,
+        count: goalUnit == .books ? year.booksFinished : year.hoursListened,
+        goal: goalUnit == .books ? bookGoal : hourGoal,
+        unit: goalUnit == .books ? .books : .hours
+      )
+      .onTapGesture { router.homePath.append(NavigationDestination.stats) }
+      .accessibilityAddTraits(.isButton)
+    }
+  }
 
   private var continueItems: [BookCard.Model] {
     for section in model.sections {
@@ -201,7 +223,7 @@ struct SirenLiveHome: View {
       }
     case .series(let items) where !items.isEmpty:
       SirenSectionHeader(title: section.title)
-      SirenCoverShelf(books: items.map(seriesBook)) { book in
+      SirenCoverShelf(books: items.map(SirenBook.init(series:))) { book in
         guard let libraryID = libraries.current?.id else { return }
         router.homePath.append(NavigationDestination.series(id: book.id, name: book.title, libraryID: libraryID))
       }
@@ -211,17 +233,6 @@ struct SirenLiveHome: View {
     default:
       EmptyView()
     }
-  }
-
-  private func seriesBook(_ series: SeriesCard.Model) -> SirenBook {
-    var book = SirenBook(
-      id: series.id,
-      title: series.title,
-      author: series.bookCount == 1 ? "1 book" : "\(series.bookCount) books",
-      coverURL: series.bookCovers.first?.url
-    )
-    book.progress = series.progress ?? 0
-    return book
   }
 
   private func authorRow(_ authors: [AuthorCard.Model]) -> some View {
@@ -283,9 +294,18 @@ struct SirenLiveHome: View {
         .font(.system(size: 15, weight: .semibold))
         .foregroundStyle(.white)
         .frame(width: 32, height: 32)
-        .background(Color(sirenHex: 0x3B4A5C), in: Circle())
+        .background(plate, in: Circle())
     }
     .accessibilityLabel("Profile and settings")
+  }
+
+  /// Household plates: the server admin is slate, other listeners plum, until Phase 2 lets
+  /// each member pick one.
+  private var plate: Color {
+    switch authentication.server?.userType {
+    case .root, .admin: Color(sirenHex: 0x3B4A5C)
+    default: Color(sirenHex: 0x8E4A8C)
+    }
   }
 
   private var initial: String {

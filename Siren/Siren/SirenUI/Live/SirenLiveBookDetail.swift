@@ -9,7 +9,6 @@ struct SirenLiveBookDetail: View {
 
   @State private var seriesModel: LibraryPage.Model?
   @State private var collectionSelector: CollectionMode?
-  @State private var showsFullDescription = false
 
   private let coverSide: CGFloat = 220
   private let seriesCoverSide: CGFloat = 104
@@ -34,6 +33,8 @@ struct SirenLiveBookDetail: View {
         detailsSection
       }
       .padding(.bottom, 32)
+      .frame(maxWidth: 720)
+      .frame(maxWidth: .infinity)
     }
     .modifier(BookDetailNavigationTitle(title: model.title, revealOffset: coverSide + 44))
     .background(SirenTheme.ground)
@@ -184,7 +185,8 @@ struct SirenLiveBookDetail: View {
         Button(action: model.onPlayTapped) {
           Label(playTitle(book), systemImage: model.isPlaying ? "pause.fill" : "play.fill")
             .monospacedDigit()
-            .lineLimit(1)
+            .lineLimit(2)
+            .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 16)
         }
@@ -338,15 +340,7 @@ struct SirenLiveBookDetail: View {
   private func aboutSection(_ text: String) -> some View {
     VStack(alignment: .leading, spacing: 8) {
       SirenSectionHeader(title: "About")
-      Text(text)
-        .font(.body)
-        .foregroundStyle(SirenTheme.ink)
-        .lineLimit(showsFullDescription ? nil : 6)
-        .fixedSize(horizontal: false, vertical: true)
-      if !showsFullDescription, text.count > 320 {
-        Button("More") { showsFullDescription = true }
-          .font(.subheadline.weight(.semibold))
-      }
+      SirenExpandableText(text: text, lineLimit: 6)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.horizontal, 20)

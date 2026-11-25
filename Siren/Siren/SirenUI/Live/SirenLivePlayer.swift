@@ -7,13 +7,16 @@ struct SirenLivePlayer: View {
   var onGoToBook: (String) -> Void
 
   @ObservedObject private var preferences = UserPreferences.shared
+  @AppStorage(SirenSettings.artStyle) private var style: SirenArtStyleChoice = .coverReveal
+  @AppStorage(SirenSettings.artInPlayer) private var showArtInPlayer = true
   @State private var art: PlayerArt = .cover
 
   var body: some View {
-    SirenPlayerView(book: SirenBook(player: model), playback: playback, pages: [.cover], art: $art) {
+    SirenPlayerView(book: SirenBook(player: model), playback: playback, pages: pages, flags: flags, art: $art) {
       moreMenu
     }
     .onAppear {
+      art = pages.last ?? .cover
       model.onAppear()
       UIApplication.shared.isIdleTimerDisabled = preferences.keepScreenAwakeInPlayer
     }
@@ -22,6 +25,18 @@ struct SirenLivePlayer: View {
       UIApplication.shared.isIdleTimerDisabled = newValue
     }
     .modifier(SirenPlayerSheets(model: model))
+  }
+
+  /// The map joins the cover when it's the chosen progress art, and opens first.
+  private var pages: [PlayerArt] {
+    showArtInPlayer && style == .map ? [.cover, .map] : [.cover]
+  }
+
+  /// Bookmarks as fractions of the book, for the map's flags.
+  private var flags: [Double] {
+    let total = model.playbackProgress.total
+    guard total > 0, let bookmarks = model.bookmarks?.bookmarks else { return [] }
+    return bookmarks.map { min(max(Double($0.time) / total, 0), 1) }
   }
 
   private var playback: SirenPlayback {

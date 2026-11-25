@@ -13,10 +13,6 @@ struct SirenLiveLibrary: View {
   @State private var scope: SirenLibraryScope = .books
   @State private var progressFilter: ProgressFilter = .all
 
-  private let columns = [
-    GridItem(.adaptive(minimum: 100, maximum: 170), spacing: 14, alignment: .top)
-  ]
-
   /// Audiobookshelf's progress filter values.
   private enum ProgressFilter: String, CaseIterable, Identifiable {
     case all = ""
@@ -52,8 +48,8 @@ struct SirenLiveLibrary: View {
     Group {
       switch scope {
       case .books: booksGrid
-      case .series: SeriesPage(model: series)
-      case .authors: AuthorsPage(model: authors)
+      case .series: SirenSeriesGrid(model: series)
+      case .authors: SirenAuthorList(model: authors)
       }
     }
     .safeAreaInset(edge: .top, spacing: 0) {
@@ -74,81 +70,26 @@ struct SirenLiveLibrary: View {
   }
 
   private var booksGrid: some View {
-    ScrollView {
-      LazyVGrid(columns: columns, alignment: .leading, spacing: 22) {
-        ForEach(books.items) { item in
-          cell(item)
+    SirenBookGrid(model: books, isFiltered: progressFilter != .all)
+      .onAppear {
+        // Siren's menu only offers progress filters; drop any other saved filter so the grid
+        // never looks unfiltered while it isn't.
+        progressFilter = ProgressFilter(preferences.libraryFilter)
+        if preferences.libraryFilter != progressFilter.filter {
+          preferences.libraryFilter = .all
+          books.onFilterPreferenceChanged(.all)
         }
       }
-      .padding(.horizontal, 20)
-      .padding(.top, 4)
-
-      if books.hasMorePages {
-        PaginationFooter(hasError: books.pageLoadFailed, onLoadMore: books.loadNextPageIfNeeded)
+      .onChange(of: preferences.collapseSeriesInLibrary) { _, _ in
+        books.onCollapseSeriesToggled()
       }
-    }
-    .overlay {
-      if books.items.isEmpty {
-        if books.isLoading {
-          ProgressView()
-        } else if progressFilter != .all {
-          ContentUnavailableView(
-            "No books",
-            systemImage: "books.vertical",
-            description: Text("Nothing matches this filter.")
-          )
-        }
+      .onChange(of: progressFilter) { _, filter in
+        preferences.libraryFilter = filter.filter
+        books.onFilterPreferenceChanged(filter.filter)
       }
-    }
-    .refreshable { await books.refresh() }
-    .onAppear {
-      books.onAppear()
-      // Siren's menu only offers progress filters; drop any other saved filter so the grid
-      // never looks unfiltered while it isn't.
-      progressFilter = ProgressFilter(preferences.libraryFilter)
-      if preferences.libraryFilter != progressFilter.filter {
-        preferences.libraryFilter = .all
-        books.onFilterPreferenceChanged(.all)
+      .toolbar {
+        ToolbarItem(placement: .topBarTrailing) { sortMenu }
       }
-    }
-    .onChange(of: preferences.collapseSeriesInLibrary) { _, _ in
-      books.onCollapseSeriesToggled()
-    }
-    .onChange(of: progressFilter) { _, filter in
-      preferences.libraryFilter = filter.filter
-      books.onFilterPreferenceChanged(filter.filter)
-    }
-    .toolbar {
-      ToolbarItem(placement: .topBarTrailing) { sortMenu }
-    }
-  }
-
-  @ViewBuilder private func cell(_ item: LibraryView.Item) -> some View {
-    switch item {
-    case .book(let card):
-      NavigationLink(value: NavigationDestination.book(id: card.id)) {
-        SirenLibraryCell(book: SirenBook(card: card))
-      }
-      .buttonStyle(.plain)
-    case .series(let series):
-      if let libraryID = libraries.current?.id {
-        NavigationLink(value: NavigationDestination.series(id: series.id, name: series.title, libraryID: libraryID)) {
-          SirenLibraryCell(book: seriesBook(series))
-        }
-        .buttonStyle(.plain)
-      }
-    }
-  }
-
-  private func seriesBook(_ series: SeriesCard.Model) -> SirenBook {
-    var book = SirenBook(
-      id: series.id,
-      title: series.title,
-      author: series.bookCount == 1 ? "1 book" : "\(series.bookCount) books",
-      coverURL: series.bookCovers.first?.url
-    )
-    book.progress = series.progress ?? 0
-    return book
   }
 
   private var sortMenu: some View {

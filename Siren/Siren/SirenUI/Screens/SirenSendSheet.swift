@@ -41,10 +41,14 @@ struct SirenSendSheet: View {
           Button("Cancel") { dismiss() }
         }
         ToolbarItem(placement: .confirmationAction) {
-          Button("Send") { dismiss() }
-            .buttonStyle(.borderedProminent)
-            .fontWeight(.semibold)
-            .disabled(recipients.isEmpty)
+          Button {
+            dismiss()
+          } label: {
+            Text("Send").foregroundStyle(SirenTheme.onTint)
+          }
+          .buttonStyle(.borderedProminent)
+          .fontWeight(.semibold)
+          .disabled(recipients.isEmpty)
         }
       }
     }

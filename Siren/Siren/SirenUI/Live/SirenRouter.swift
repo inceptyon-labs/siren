@@ -13,11 +13,15 @@ final class SirenRouter {
   /// Pushes a book onto the current tab, closing the player first.
   func openBook(_ id: String) {
     PlayerManager.shared.hideFullPlayer()
-    let destination = NavigationDestination.book(id: id)
+    push(NavigationDestination.book(id: id))
+  }
+
+  /// Pushes onto the stack of the tab on screen.
+  func push<Value: Hashable>(_ value: Value) {
     switch tab {
-    case .home, .household: homePath.append(destination)
-    case .library: libraryPath.append(destination)
-    case .search: searchPath.append(destination)
+    case .home, .household: homePath.append(value)
+    case .library: libraryPath.append(value)
+    case .search: searchPath.append(value)
     }
   }
 }
@@ -29,6 +33,10 @@ extension View {
       switch destination {
       case .book(let id):
         SirenLiveBookDetail(bookID: id)
+      case .author(let id, let name, let libraryID):
+        SirenLiveAuthor(id: id, name: name, libraryID: libraryID)
+      case .series, .narrator, .genre, .tag, .authorLibrary:
+        SirenLiveBookList(destination: destination)
       default:
         destination.resolvedView
       }

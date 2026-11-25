@@ -7,8 +7,15 @@ struct SirenContinueCard: View {
   var onOpen: () -> Void
   var onResume: () -> Void
 
+  @Environment(\.dynamicTypeSize) private var typeSize
+
   var body: some View {
-    HStack(alignment: .top, spacing: 16) {
+    // At accessibility text sizes the details need the full width, so they go under the cover.
+    let layout =
+      typeSize.isAccessibilitySize
+      ? AnyLayout(VStackLayout(alignment: .leading, spacing: 16))
+      : AnyLayout(HStackLayout(alignment: .top, spacing: 16))
+    layout {
       Button(action: onOpen) {
         RevealCover(book: book, showTicks: true, resolution: .large)
           .frame(width: 150, height: 150)
@@ -23,7 +30,7 @@ struct SirenContinueCard: View {
         Text(book.author)
           .font(.subheadline)
           .foregroundStyle(SirenTheme.secondary)
-          .lineLimit(1)
+          .lineLimit(typeSize.isAccessibilitySize ? 2 : 1)
         if book.chapterCount > 1, !book.chapterRemaining.isEmpty {
           Text("Ch \(book.currentChapter) · \(book.chapterRemaining) left")
             .font(.subheadline.weight(.semibold))
@@ -40,6 +47,9 @@ struct SirenContinueCard: View {
         Button(action: onResume) {
           Label(isPlaying ? "Pause" : "Resume", systemImage: isPlaying ? "pause.fill" : "play.fill")
             .font(.headline)
+            .foregroundStyle(SirenTheme.onTint)
+            .lineLimit(1)
+            .fixedSize()
             .padding(.horizontal, 6)
             .frame(minHeight: 32)
         }
@@ -164,5 +174,41 @@ struct SirenCoverShelf: View {
       }
     }
     .scrollClipDisabled()
+  }
+}
+
+/// Body text clipped to a few lines, with More only when the clip actually hides something.
+struct SirenExpandableText: View {
+  let text: String
+  var lineLimit = 6
+
+  @State private var isExpanded = false
+  @State private var isTruncated = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Text(text)
+        .font(.body)
+        .foregroundStyle(SirenTheme.ink)
+        .lineLimit(isExpanded ? nil : lineLimit)
+        .fixedSize(horizontal: false, vertical: true)
+        .background {
+          // The full text fits in the clipped frame only when nothing is hidden.
+          ViewThatFits(in: .vertical) {
+            Text(text)
+              .font(.body)
+              .fixedSize(horizontal: false, vertical: true)
+              .hidden()
+              .onAppear { isTruncated = false }
+            Color.clear
+              .onAppear { isTruncated = true }
+          }
+          .id(text)
+        }
+      if isTruncated, !isExpanded {
+        Button("More") { isExpanded = true }
+          .font(.subheadline.weight(.semibold))
+      }
+    }
   }
 }

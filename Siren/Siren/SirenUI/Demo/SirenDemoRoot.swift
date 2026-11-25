@@ -67,7 +67,12 @@ struct SirenDemoRoot: View {
       .tint(SirenTheme.tint)
       .onAppear(perform: route)
       .sheet(isPresented: $showPlayer) {
-        SirenPlayerView(book: Demo.saltRoad, playback: Demo.playback, art: $playerArt) {
+        SirenPlayerView(
+          book: Demo.saltRoad,
+          playback: Demo.playback,
+          flags: [3, 9, 13].map { Demo.saltRoad.chapterStarts[$0 - 1] },
+          art: $playerArt
+        ) {
           Button("Car Mode", systemImage: "car") {
             showPlayer = false
             showCar = true
@@ -80,7 +85,7 @@ struct SirenDemoRoot: View {
       }
       .sheet(isPresented: $showSend) {
         SirenSendSheet(book: Demo.saltRoad)
-          .presentationDetents([.medium, .large])
+          .presentationDetents([.fraction(0.75), .large])
           .presentationDragIndicator(.visible)
       }
       .fullScreenCover(isPresented: $showCar) {

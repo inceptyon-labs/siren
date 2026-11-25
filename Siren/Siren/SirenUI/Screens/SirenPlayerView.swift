@@ -36,6 +36,8 @@ struct SirenPlayerView<MoreMenu: View>: View {
   let book: SirenBook
   let playback: SirenPlayback
   var pages: [PlayerArt] = PlayerArt.allCases
+  /// Bookmarks as fractions of the book, planted as flags on the map.
+  var flags: [Double] = []
   @Binding var art: PlayerArt
   @ViewBuilder var moreMenu: () -> MoreMenu
 
@@ -153,11 +155,8 @@ struct SirenPlayerView<MoreMenu: View>: View {
     case .cover:
       RevealCover(book: book, showTicks: true, cornerRadius: 10, resolution: .large)
     case .map:
-      Image("SirenDemoMapSaltRoad")
-        .resizable()
-        .scaledToFit()
+      FogMapArt(book: book, flags: flags)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .accessibilityLabel("Map of \(book.title), \(Int((book.progress * 100).rounded())) percent uncovered")
     case .voice:
       VoicePrintView(book: book)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))

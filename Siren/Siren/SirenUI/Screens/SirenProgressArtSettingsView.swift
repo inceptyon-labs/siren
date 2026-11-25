@@ -13,7 +13,7 @@ struct SirenProgressArtSettingsView: View {
   var body: some View {
     List {
       Section {
-        ForEach(SirenArtStyleChoice.allCases) { choice in
+        ForEach(styleChoices) { choice in
           styleRow(choice)
         }
       } header: {
@@ -26,9 +26,12 @@ struct SirenProgressArtSettingsView: View {
         Toggle("In the player", isOn: $showInPlayer)
           .foregroundStyle(SirenTheme.ink)
           .listRowBackground(SirenTheme.raised)
-        Toggle("Finished books shelf", isOn: $showOnFinishedShelf)
-          .foregroundStyle(SirenTheme.ink)
-          .listRowBackground(SirenTheme.raised)
+        // The finished-books shelf arrives with the household and series work; demo only until then.
+        if SirenDemoScreen.requested != nil {
+          Toggle("Finished books shelf", isOn: $showOnFinishedShelf)
+            .foregroundStyle(SirenTheme.ink)
+            .listRowBackground(SirenTheme.raised)
+        }
       }
 
       Section("Yearly goal") {
@@ -128,6 +131,12 @@ struct SirenProgressArtSettingsView: View {
       .clipShape(shape)
       .overlay { shape.strokeBorder(.black.opacity(0.08), lineWidth: 0.5) }
       .shadow(color: .black.opacity(0.18), radius: 4, y: 2)
+  }
+
+  /// Voice print needs the loudness scan from trim silence (Phase 4); the demo still shows it.
+  private var styleChoices: [SirenArtStyleChoice] {
+    SirenDemoScreen.requested == nil
+      ? SirenArtStyleChoice.allCases.filter { $0 != .voicePrint } : SirenArtStyleChoice.allCases
   }
 
   private var goalValue: Binding<Int> {

@@ -83,6 +83,7 @@ struct StarRating: View {
         Text("(\(count.formatted()))")
           .font(.footnote)
           .foregroundStyle(SirenTheme.secondary)
+          .fixedSize()
       }
     }
     .accessibilityElement(children: .ignore)

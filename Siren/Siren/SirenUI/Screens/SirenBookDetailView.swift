@@ -73,12 +73,18 @@ struct SirenBookDetailView: View {
 
   private var ratings: some View {
     VStack(spacing: 4) {
-      HStack(spacing: 4) {
-        StarRating(rating: book.rating, count: book.ratingCount)
-        Text("on Audible")
-          .font(.footnote)
-          .foregroundStyle(SirenTheme.secondary)
+      ViewThatFits(in: .horizontal) {
+        HStack(spacing: 4) {
+          StarRating(rating: book.rating, count: book.ratingCount)
+          Text("on Audible")
+        }
+        VStack(spacing: 2) {
+          StarRating(rating: book.rating, count: book.ratingCount)
+          Text("on Audible")
+        }
       }
+      .font(.footnote)
+      .foregroundStyle(SirenTheme.secondary)
       Text("Story \(oneDecimal(min(5, book.rating + 0.1))) · Performance \(oneDecimal(max(0, book.rating - 0.1)))")
         .font(.footnote)
         .foregroundStyle(SirenTheme.secondary)

@@ -29,6 +29,17 @@ extension SirenBook {
     }
   }
 
+  /// A series tile: its first cover, its name and how many books it has.
+  init(series: SeriesCard.Model) {
+    self.init(
+      id: series.id,
+      title: series.title,
+      author: series.bookCount == 1 ? "1 book" : "\(series.bookCount) books",
+      coverURL: series.bookCovers.first?.url
+    )
+    progress = series.progress ?? 0
+  }
+
   /// The book in the player, with its real chapters.
   init(player: BookPlayer.Model) {
     self.init(id: player.id, title: player.title, author: player.author, coverURL: player.coverURL)
