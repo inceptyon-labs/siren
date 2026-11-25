@@ -41,6 +41,7 @@ enum SirenTab: Hashable { case home, library, household, search }
 enum SirenRoute: Hashable {
   case book(String)
   case progressArt
+  case profiles
 }
 
 /// Demo screens with `-SirenDemo`, upstream's screens for podcast libraries, Siren's otherwise.
@@ -50,10 +51,16 @@ struct SirenRootSwitch: View {
   var body: some View {
     if let screen = SirenDemoScreen.requested {
       SirenDemoRoot(screen: screen)
-    } else if libraries.current?.mediaType == .podcast {
-      ContentView()
     } else {
-      SirenLiveRoot()
+      Group {
+        if libraries.current?.mediaType == .podcast {
+          ContentView()
+        } else {
+          SirenLiveRoot()
+        }
+      }
+      // Above both roots, so a podcast library can't skip a profile's Face ID check.
+      .overlay { SirenProfileGate() }
     }
   }
 }
@@ -193,6 +200,8 @@ struct SirenDemoRoot: View {
       )
     case .progressArt:
       SirenProgressArtSettingsView()
+    case .profiles:
+      EmptyView()
     }
   }
 }

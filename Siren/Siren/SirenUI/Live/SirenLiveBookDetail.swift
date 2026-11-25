@@ -11,6 +11,9 @@ struct SirenLiveBookDetail: View {
   @State private var seriesModel: LibraryPage.Model?
   @State private var collectionSelector: CollectionMode?
   @State private var showingSend = false
+  /// Nil until the "Liked" playlist has loaded.
+  @State private var isLiked: Bool?
+  @State private var isSavingLike = false
   @ObservedObject private var authentication = Audiobookshelf.shared.authentication
 
   private let coverSide: CGFloat = 220
@@ -47,6 +50,7 @@ struct SirenLiveBookDetail: View {
     .navigationTitle(model.title)
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
+      ToolbarItem(placement: .topBarTrailing) { likeButton }
       ToolbarItem(placement: .topBarTrailing) { moreMenu }
     }
     .overlay {
@@ -67,6 +71,7 @@ struct SirenLiveBookDetail: View {
     }
     .onAppear(perform: model.onAppear)
     .task(id: model.series.first?.id) { loadSeries() }
+    .task(id: model.bookID) { isLiked = (try? await Likes.likedIDs())?.contains(model.bookID) }
     .fullScreenCover(item: $model.ebookReader) { reader in
       NavigationStack {
         EbookReaderView(model: reader)
@@ -459,6 +464,29 @@ struct SirenLiveBookDetail: View {
   }
 
   // MARK: More
+
+  /// Likes live in a private "Liked" playlist on the server; recommendations start from them.
+  @ViewBuilder private var likeButton: some View {
+    if let isLiked {
+      Button(isLiked ? "Unlike" : "Like", systemImage: isLiked ? "heart.fill" : "heart") {
+        let newValue = !isLiked
+        self.isLiked = newValue
+        isSavingLike = true
+        Task {
+          defer { isSavingLike = false }
+          do {
+            try await Likes.set(newValue, itemID: model.bookID)
+          } catch {
+            self.isLiked = !newValue
+            Toast(error: "Couldn't save your like").show()
+          }
+        }
+      }
+      // One save at a time: each one reads the playlist, then changes it.
+      .disabled(isSavingLike)
+      .sensoryFeedback(.selection, trigger: isLiked)
+    }
+  }
 
   private var moreMenu: some View {
     Menu {

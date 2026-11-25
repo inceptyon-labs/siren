@@ -50,7 +50,7 @@ struct ContentView: View {
       .observesHinge()
       .fullScreenCover(isPresented: $playerManager.isShowingFullPlayer) {
         if let currentPlayer = playerManager.current {
-          if preferences.assistedPlayer {
+          if preferences.assistedPlayer || SirenProfiles.shared.isKidsActive {  // SIREN: kids profile
             AssistedPlayer(model: currentPlayer)
               .displayScaled()
               .interactiveDismissDisabled()

@@ -58,6 +58,8 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Siren uses the camera to read a page of your printed book so it can find that spot in the audiobook. No photos are saved or sent anywhere.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Siren uses Face ID to keep a profile private, and to keep kids in the kids profile.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Siren needs access to your local network to connect to your Audiobookshelf server and stream audiobooks.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

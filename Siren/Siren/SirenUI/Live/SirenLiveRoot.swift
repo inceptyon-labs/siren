@@ -12,6 +12,7 @@ struct SirenLiveRoot: View {
 
   @State private var router = SirenRouter.shared
   @State private var carMode = SirenCarMode.shared
+  @State private var profiles = SirenProfiles.shared
   @State private var showingOnboarding = false
   @State private var showingServerList = false
   @State private var didCheckStartup = false
@@ -19,6 +20,8 @@ struct SirenLiveRoot: View {
 
   var body: some View {
     tabs
+      // A profile switch rebuilds every screen on the new person's data.
+      .id(profiles.activeID)
       .tint(SirenTheme.tint)
       .sheet(isPresented: playerBinding(assisted: false)) {
         if let current = playerManager.current {
@@ -57,6 +60,7 @@ struct SirenLiveRoot: View {
           .displaySheetScaled()
       }
       .onAppear(perform: checkStartup)
+      .task(id: profiles.activeID) { await SirenProfiles.ensureLibrary() }
       .onChange(of: libraries.current) { _, _ in
         showingServerList = false
         showingOnboarding = false
@@ -72,7 +76,7 @@ struct SirenLiveRoot: View {
       }
       .onChange(of: scenePhase) { _, phase in
         guard phase == .active else { return }
-        if preferences.openPlayerOnLaunch, playerManager.current != nil {
+        if preferences.openPlayerOnLaunch || profiles.isKidsActive, playerManager.current != nil {
           playerManager.showFullPlayer()
         }
         carMode.checkRoute()
@@ -103,10 +107,13 @@ struct SirenLiveRoot: View {
     }
   }
 
+  /// The kids profile always gets the assisted player.
+  private var usesAssistedPlayer: Bool { preferences.assistedPlayer || profiles.isKidsActive }
+
   private func playerBinding(assisted: Bool) -> Binding<Bool> {
     Binding(
       get: {
-        playerManager.isShowingFullPlayer && preferences.assistedPlayer == assisted && !carMode.isPresented
+        playerManager.isShowingFullPlayer && usesAssistedPlayer == assisted && !carMode.isPresented
       },
       set: { isShowing in
         if !isShowing { playerManager.hideFullPlayer() }

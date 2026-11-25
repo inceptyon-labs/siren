@@ -12,4 +12,10 @@ enum SirenSettings {
   static let goalOnHome = "siren.goal.onHome"
   /// Bluetooth and car audio outputs that open car mode when they connect (port names).
   static let carDevices = "siren.car.devices"
+  /// Profiles (connection IDs) that ask for Face ID before switching to them.
+  static let lockedProfiles = "siren.profiles.locked"
+  /// Profiles that open the assisted player and ask for Face ID before switching away.
+  static let kidsProfiles = "siren.profiles.kids"
+  /// The profile to return to if a Face ID check for a switch doesn't pass (set while it's open).
+  static let pendingProfileCheck = "siren.profiles.pendingCheck"
 }

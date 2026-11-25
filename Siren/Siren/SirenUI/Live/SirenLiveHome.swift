@@ -23,7 +23,9 @@ struct SirenLiveHome: View {
   @State private var showingSettings = false
   @State private var showingServerList = false
   @State private var showingInvite = false
+  @State private var showingAdmin = false
   @State private var sentRefresh = 0
+  @State private var profiles = SirenProfiles.shared
 
   private struct YearGoal {
     var finished: [SirenBook]
@@ -106,6 +108,9 @@ struct SirenLiveHome: View {
     }
     .sheet(isPresented: $showingInvite) {
       SirenInviteView()
+    }
+    .sheet(isPresented: $showingAdmin) {
+      SirenServerAdminView()
     }
   }
 
@@ -298,38 +303,65 @@ struct SirenLiveHome: View {
 
   private var profileMenu: some View {
     Menu {
-      if model.availableLibraries.count > 1 {
-        Picker(
-          "Library",
-          selection: Binding(
-            get: { libraries.current?.id ?? "" },
-            set: { model.onLibrarySelected($0) }
-          )
-        ) {
-          ForEach(model.availableLibraries) { library in
-            Text(library.name).tag(library.id)
+      if profiles.profiles.count > 1 {
+        Section("Profiles") {
+          ForEach(profiles.profiles) { profile in
+            Button {
+              Task { await profiles.switchTo(profile.id) }
+            } label: {
+              if profile.id == profiles.activeID {
+                Label(profile.name, systemImage: "checkmark")
+              } else {
+                Text(profile.name)
+              }
+              Text(profile.server)
+            }
           }
         }
       }
-      Section {
-        Button("Progress Art & Goal", systemImage: "paintbrush.pointed") {
-          router.homePath.append(SirenRoute.progressArt)
-        }
-        Button("Listening Stats", systemImage: "chart.bar") {
-          router.homePath.append(NavigationDestination.stats)
-        }
-        Button("Downloads", systemImage: "arrow.down.circle") {
-          router.homePath.append(NavigationDestination.offline)
-        }
-      }
-      if isAdmin {
+      if profiles.isKidsActive, let id = profiles.activeID {
         Section {
-          Button("Invite to Siren…", systemImage: "qrcode") { showingInvite = true }
+          Button("Leave Kids Profile…", systemImage: "lock.open") {
+            Task { await profiles.setKids(false, for: id) }
+          }
         }
       }
-      Section {
-        Button("Servers", systemImage: "server.rack") { showingServerList = true }
-        Button("Settings", systemImage: "gearshape") { showingSettings = true }
+      if !profiles.isKidsActive {
+        if model.availableLibraries.count > 1 {
+          Picker(
+            "Library",
+            selection: Binding(
+              get: { libraries.current?.id ?? "" },
+              set: { model.onLibrarySelected($0) }
+            )
+          ) {
+            ForEach(model.availableLibraries) { library in
+              Text(library.name).tag(library.id)
+            }
+          }
+        }
+        Section {
+          Button("Progress Art & Goal", systemImage: "paintbrush.pointed") {
+            router.homePath.append(SirenRoute.progressArt)
+          }
+          Button("Listening Stats", systemImage: "chart.bar") {
+            router.homePath.append(NavigationDestination.stats)
+          }
+          Button("Downloads", systemImage: "arrow.down.circle") {
+            router.homePath.append(NavigationDestination.offline)
+          }
+        }
+        if isAdmin {
+          Section {
+            Button("Invite to Siren…", systemImage: "qrcode") { showingInvite = true }
+            Button("Server Admin", systemImage: "wrench.and.screwdriver") { showingAdmin = true }
+          }
+        }
+        Section {
+          Button("Servers", systemImage: "server.rack") { showingServerList = true }
+          Button("Profiles…", systemImage: "person.2") { router.homePath.append(SirenRoute.profiles) }
+          Button("Settings", systemImage: "gearshape") { showingSettings = true }
+        }
       }
     } label: {
       Text(initial)
