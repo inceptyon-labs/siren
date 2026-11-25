@@ -72,6 +72,12 @@ struct SirenLiveHome: View {
             .id("\(libraryID)/\(username)")
         }
 
+        // Requests are off in a kids profile, and these are all books to request.
+        if !profiles.isKidsActive {
+          SirenBecauseYouLikedShelf { router.homePath.append(SirenRoute.requests) }
+        }
+        SirenHighlyRatedShelf { open($0.id) }
+
         ForEach(model.sections, id: \.id) { section in
           shelf(section)
         }
@@ -87,6 +93,8 @@ struct SirenLiveHome: View {
     }
     .refreshable {
       sentRefresh += 1
+      // Not awaited: a first run asks Audible about the whole library.
+      Task { await SirenRecommendations.shared.refresh(force: true) }
       await model.refresh()
       await loadYear()
     }
@@ -95,6 +103,7 @@ struct SirenLiveHome: View {
       sentRefresh += 1
     }
     .task(id: libraries.current?.id) { await loadYear() }
+    .task(id: libraries.current?.id) { await SirenRecommendations.shared.refresh() }
     .task(id: heroKey) { await loadHeroDetail() }
     .onChange(of: libraries.current) { _, new in model.onReset(new != nil) }
     .onChange(of: preferences.homeSections) { _, _ in model.onPreferencesChanged() }

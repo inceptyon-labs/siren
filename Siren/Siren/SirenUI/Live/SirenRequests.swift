@@ -62,6 +62,19 @@ final class SirenRequests {
     await refresh()
   }
 
+  /// Requests a book Audible recommended.
+  func request(_ product: AudibleProduct) async throws {
+    guard let client else { return }
+    try await client.request(
+      asin: product.asin,
+      title: product.title,
+      author: product.author,
+      narrator: product.narrator.isEmpty ? nil : product.narrator,
+      coverArtUrl: product.coverURL?.absoluteString
+    )
+    await refresh()
+  }
+
   func cancel(_ request: ReadMeABook.Request) async {
     guard let client else { return }
     do {
@@ -274,13 +287,19 @@ struct SirenRequestsShelf: View {
         .background(SirenTheme.raised, in: RoundedRectangle(cornerRadius: SirenTheme.rowRadius, style: .continuous))
       }
     }
-    .task(id: refreshID) {
+    // Also restarts when a request starts elsewhere (a recommendation), so its progress shows.
+    .task(id: Poll(refreshID: refreshID, isActive: requests.requests.contains { $0.status.isActive })) {
       while !Task.isCancelled {
         await requests.refresh()
         guard requests.requests.contains(where: { $0.status.isActive }) else { return }
         try? await Task.sleep(for: .seconds(30))
       }
     }
+  }
+
+  private struct Poll: Hashable {
+    let refreshID: Int
+    let isActive: Bool
   }
 
   private func row(_ request: ReadMeABook.Request) -> some View {

@@ -167,6 +167,23 @@ public struct ReadMeABook: Sendable {
   /// Asks ReadMeABook to find the book (`POST /api/requests`). Throws a 409 `Failure` when it's
   /// already in the library, already requested or ignored.
   public func request(_ book: SearchResult) async throws {
+    try await request(
+      asin: book.asin,
+      title: book.title,
+      author: book.author,
+      narrator: book.narrator,
+      coverArtUrl: book.coverArtUrl
+    )
+  }
+
+  /// `POST /api/requests` for a book known only by its Audible details.
+  public func request(
+    asin: String,
+    title: String,
+    author: String,
+    narrator: String?,
+    coverArtUrl: String?
+  ) async throws {
     struct Body: Encodable {
       struct Book: Encodable {
         let asin: String
@@ -178,13 +195,7 @@ public struct ReadMeABook: Sendable {
       let audiobook: Book
     }
     let body = Body(
-      audiobook: .init(
-        asin: book.asin,
-        title: book.title,
-        author: book.author,
-        narrator: book.narrator,
-        coverArtUrl: book.coverArtUrl
-      )
+      audiobook: .init(asin: asin, title: title, author: author, narrator: narrator, coverArtUrl: coverArtUrl)
     )
     let _: Ignored = try await send("api/requests", method: "POST", body: body)
   }

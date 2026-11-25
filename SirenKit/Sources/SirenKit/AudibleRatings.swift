@@ -29,12 +29,10 @@ public final class AudibleRatings {
 
   private static let maxAge: TimeInterval = 14 * 24 * 3600
   private static let batchSize = 50
-  private static let spacing = Duration.milliseconds(300)
 
   @ObservationIgnored private var entries: [String: Entry] = [:]
   /// The batch each ASIN being fetched is in, so a second caller waits for it.
   @ObservationIgnored private var inFlight: [String: Task<Void, Never>] = [:]
-  @ObservationIgnored private var nextRequest = ContinuousClock.now
   @ObservationIgnored private var pendingSave: Task<Void, Never>?
 
   private let cacheFile = URL.cachesDirectory.appending(path: "audible-ratings.json")
@@ -74,88 +72,35 @@ public final class AudibleRatings {
 
   private func fetch(_ asins: [String]) async {
     defer { for asin in asins { inFlight[asin] = nil } }
-    // Reserve the next slot before waiting, so batches started together still go 300 ms apart.
-    let slot = max(ContinuousClock.now, nextRequest)
-    nextRequest = slot + Self.spacing
-    try? await Task.sleep(until: slot)
-
-    guard let fetched = try? await Self.request(asins) else { return }
+    guard
+      let data = try? await AudibleCatalog.get(
+        "catalog/products",
+        query: [
+          URLQueryItem(name: "asins", value: asins.joined(separator: ",")),
+          URLQueryItem(name: "response_groups", value: "rating"),
+        ]
+      ),
+      let response = try? AudibleCatalog.decoder().decode(Response.self, from: data)
+    else { return }
+    let fetched = Dictionary(
+      response.products.map { ($0.asin, $0.rating?.rating) },
+      uniquingKeysWith: { first, _ in first }
+    )
     let now = Date()
     for asin in asins {
-      let rating = fetched[asin]
+      let rating = fetched[asin] ?? nil
       entries[asin] = Entry(rating: rating, fetched: now)
       ratings[asin] = rating
     }
     scheduleSave()
   }
 
-  nonisolated private static func request(_ asins: [String]) async throws -> [String: Rating] {
-    var components = URLComponents()
-    components.scheme = "https"
-    components.host = host
-    components.path = "/1.0/catalog/products"
-    components.queryItems = [
-      URLQueryItem(name: "asins", value: asins.joined(separator: ",")),
-      URLQueryItem(name: "response_groups", value: "rating"),
-    ]
-    guard let url = components.url else { throw URLError(.badURL) }
-    let (data, response) = try await URLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 20))
-    guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
-
-    struct Response: Decodable {
-      let products: [Product]
-    }
+  private struct Response: Decodable {
     struct Product: Decodable {
       let asin: String
-      let rating: Ratings?
+      let rating: AudibleCatalog.RawRatings?
     }
-    struct Ratings: Decodable {
-      let overallDistribution: Distribution?
-      let storyDistribution: Distribution?
-      let performanceDistribution: Distribution?
-    }
-    struct Distribution: Decodable {
-      let averageRating: Double?
-      let numRatings: Int?
-
-      /// The average, when anyone has rated it.
-      var average: Double? {
-        guard let averageRating, (numRatings ?? 0) > 0 else { return nil }
-        return averageRating
-      }
-    }
-
-    let decoder = JSONDecoder()
-    decoder.keyDecodingStrategy = .convertFromSnakeCase
-    let products = try decoder.decode(Response.self, from: data).products
-    var ratings: [String: Rating] = [:]
-    for product in products {
-      guard let overall = product.rating?.overallDistribution, let average = overall.average else { continue }
-      ratings[product.asin] = Rating(
-        average: average,
-        count: overall.numRatings ?? 0,
-        story: product.rating?.storyDistribution?.average,
-        performance: product.rating?.performanceDistribution?.average
-      )
-    }
-    return ratings
-  }
-
-  /// The Audible store for the device's region. Each store has its own ratings.
-  nonisolated private static var host: String {
-    switch Locale.current.region?.identifier {
-    case "GB", "IE": "api.audible.co.uk"
-    case "DE", "AT", "CH": "api.audible.de"
-    case "FR", "BE": "api.audible.fr"
-    case "CA": "api.audible.ca"
-    case "AU", "NZ": "api.audible.com.au"
-    case "IN": "api.audible.in"
-    case "IT": "api.audible.it"
-    case "ES": "api.audible.es"
-    case "JP": "api.audible.co.jp"
-    case "BR": "api.audible.com.br"
-    default: "api.audible.com"
-    }
+    let products: [Product]
   }
 
   // MARK: Cache
