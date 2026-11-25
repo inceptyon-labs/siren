@@ -4,7 +4,8 @@
 //   asc.mjs check
 //     Looks the app up by bundle ID and says whether the record exists. Exits 1 when it doesn't.
 //   asc.mjs testflight <build> <what-to-test.txt>
-//     Waits for the iOS build (tvOS with ASC_PLATFORMS=TV_OS) with this build number to finish processing, sets "What to Test" on it,
+//     Waits for the iOS build (tvOS with ASC_PLATFORMS=TV_OS) with this build number to finish processing (turning off
+//     tester emails for it as soon as it appears), sets "What to Test" on it,
 //     and makes sure the internal group "Inceptyon" exists with every build, so internal testers get each new build.
 //   asc.mjs release <version> <build> <whats-new.txt>
 //     Finds or creates the version, attaches the build, sets What's New, and submits it for review,
@@ -59,10 +60,23 @@ const findApp = async () => (await api("GET", `v1/apps?filter[bundleId]=${BUNDLE
 const missing = `no App Store Connect app for ${BUNDLE_ID}. Create it first: Apps > + > New App, platform iOS, bundle ID ${BUNDLE_ID}.`;
 const notes = (file) => fs.readFileSync(file, "utf8").trim().slice(0, 4000);
 
+// Testers aren't emailed about new builds: each one is set not to notify as soon as it appears,
+// before processing makes it available.
+async function quiet(b) {
+  const detail = (await api("GET", `v1/builds/${b.id}/buildBetaDetail`)).data;
+  if (detail.attributes.autoNotifyEnabled === false) return;
+  await api("PATCH", `v1/buildBetaDetails/${detail.id}`, { type: "buildBetaDetails", id: detail.id, attributes: { autoNotifyEnabled: false } });
+}
+
 // Processing usually takes 5 to 30 minutes.
 async function processed(app, build, platform) {
+  let quieted = false;
   for (let i = 0; i < 90; i++) {
     const b = (await api("GET", `v1/builds?filter[app]=${app.id}&filter[version]=${build}&filter[preReleaseVersion.platform]=${platform}&limit=1`)).data[0];
+    if (b && !quieted) {
+      await quiet(b);
+      quieted = true;
+    }
     const state = b?.attributes.processingState;
     if (state === "VALID") return b;
     if (state && state !== "PROCESSING") fail(`${platform} build ${build} is ${state}`);
