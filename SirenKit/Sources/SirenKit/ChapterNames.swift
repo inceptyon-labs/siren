@@ -23,6 +23,8 @@ public enum ChapterNames {
     case noNames
     /// Audible's edition is this many seconds longer (or shorter, negative) than the book.
     case lengthDiffers(Double)
+    /// Same length, but Audible's chapters start in different places, so its names wouldn't line up.
+    case marksDiffer
     /// Audible has no chapters for the book's ASIN.
     case notFound
   }
@@ -96,7 +98,12 @@ public enum ChapterNames {
       "/api/search/chapters",
       query: ["asin": asin, "region": region]
     )
-    let outcome = match(audible, duration: book.duration, bookTitle: book.title)
+    let outcome = match(
+      audible,
+      marks: chapters.map { (start: $0.start, end: $0.end) },
+      duration: book.duration,
+      bookTitle: book.title
+    )
     return Result(
       id: book.id,
       title: book.title,
@@ -124,10 +131,19 @@ public enum ChapterNames {
 
   /// How far Audible's length can be from the book's and still fit, in seconds.
   nonisolated static let tolerance: Double = 5
+  /// How far each of Audible's chapter starts can be from the book's own, in seconds.
+  nonisolated static let markTolerance: Double = 2
 
-  /// Audible's chapters, fitted to the book: as they are when the lengths agree, or moved back
-  /// by Audible's intro when the book's file was cut without the intro and outro.
-  nonisolated static func match(_ audible: Audnexus, duration: Double, bookTitle: String) -> Outcome {
+  /// Audible's names for the book's own chapters. Only titles change: the book's chapter marks
+  /// stay. Audible's starts are taken as they are when the lengths agree, or moved back by
+  /// Audible's intro when the file was cut without the intro and outro; then there must be as many
+  /// as the book has, each within `markTolerance` of the book's.
+  nonisolated static func match(
+    _ audible: Audnexus,
+    marks: [(start: Double, end: Double)],
+    duration: Double,
+    bookTitle: String
+  ) -> Outcome {
     guard let items = audible.chapters, items.count > 1 else { return .notFound }
     let named = items.filter { !isNumbered($0.title, bookTitle: bookTitle) && !isCredits($0.title) }
     guard !named.isEmpty else { return .noNames }
@@ -144,17 +160,20 @@ public enum ChapterNames {
       return .lengthDiffers(length - duration)
     }
 
-    let starts = items.map { max(0, $0.startOffsetMs / 1000 - shift) }
-    var chapters: [Chapter] = []
-    for (index, item) in items.enumerated() where starts[index] < duration {
-      let end = index + 1 < starts.count ? min(starts[index + 1], duration) : duration
-      guard end > starts[index] else { continue }
-      chapters.append(Chapter(id: chapters.count, start: starts[index], end: end, title: item.title))
+    // Audible's chapters as they fall in this file. A chapter that lay wholly inside the trimmed
+    // intro (its opening credits) isn't in the file.
+    var shifted: [(start: Double, title: String)] = []
+    for item in items {
+      let start = item.startOffsetMs / 1000 - shift
+      guard start + item.lengthMs / 1000 > 0, start < duration else { continue }
+      shifted.append((max(0, start), item.title))
     }
-    guard chapters.count > 1 else { return .lengthDiffers(length - duration) }
-    // The last chapter runs to the end of the book.
-    let last = chapters.removeLast()
-    chapters.append(Chapter(id: last.id, start: last.start, end: duration, title: last.title))
+    guard shifted.count == marks.count,
+      zip(shifted, marks).allSatisfy({ abs($0.start - $1.start) <= markTolerance })
+    else { return .marksDiffer }
+    let chapters = zip(marks, shifted).enumerated().map { index, pair in
+      Chapter(id: index, start: pair.0.start, end: pair.0.end, title: pair.1.title)
+    }
     return .ready(chapters)
   }
 

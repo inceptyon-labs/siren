@@ -31,7 +31,7 @@ struct SirenServerAdminChapters: View {
           .listRowBackground(SirenTheme.raised)
       } footer: {
         Text(
-          "Looks for books whose chapters are only numbered, like \u{201C}Chapter 1\u{201D}, and finds Audible's names for them by ASIN. Saving changes the book on the server, for every app."
+          "Looks for books whose chapters are only numbered, like \u{201C}Chapter 1\u{201D}, and finds Audible's names for them by ASIN. Only titles change; chapter marks stay where they are. Saving changes the book on the server, for every app."
         )
       }
 
@@ -82,6 +82,7 @@ struct SirenServerAdminChapters: View {
     let ready = results.filter { if case .ready = $0.outcome { true } else { false } }
     let numbered = results.filter { if case .noNames = $0.outcome { true } else { false } }
     let differs = results.filter { if case .lengthDiffers = $0.outcome { true } else { false } }
+    let marksDiffer = results.filter { if case .marksDiffer = $0.outcome { true } else { false } }
     let missing = results.filter { if case .notFound = $0.outcome { true } else { false } }
 
     if results.isEmpty {
@@ -126,6 +127,13 @@ struct SirenServerAdminChapters: View {
         "Different Length",
         footer: "Audible's edition is a different length, so its chapters wouldn't line up.",
         results: differs
+      )
+    }
+    if !marksDiffer.isEmpty {
+      otherSection(
+        "Chapters Break Differently",
+        footer: "Audible's chapters start in different places from this book's, so its names wouldn't line up.",
+        results: marksDiffer
       )
     }
     if !numbered.isEmpty {
