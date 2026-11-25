@@ -8,6 +8,7 @@ struct SirenProgressArtSettingsView: View {
   @AppStorage(SirenSettings.bookGoal) private var bookGoal = 20
   @AppStorage(SirenSettings.hourGoal) private var hourGoal = 150
   @AppStorage(SirenSettings.goalOnHome) private var showGoalOnHome = true
+  @State private var showingTour = false
 
   var body: some View {
     List {
@@ -74,6 +75,15 @@ struct SirenProgressArtSettingsView: View {
           .foregroundStyle(SirenTheme.ink)
           .listRowBackground(SirenTheme.raised)
       }
+
+      Section {
+        Button("Show the Welcome Tour") { showingTour = true }
+          .listRowBackground(SirenTheme.raised)
+      }
+    }
+    .fullScreenCover(isPresented: $showingTour) {
+      SirenTour(ending: .done)
+        .displayScaled()
     }
     .listStyle(.insetGrouped)
     .scrollContentBackground(.hidden)

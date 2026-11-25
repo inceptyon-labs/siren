@@ -15,6 +15,8 @@ struct SirenLiveRoot: View {
   @State private var profiles = SirenProfiles.shared
   @State private var endOfBook = SirenEndOfBook.shared
   @State private var showingOnboarding = false
+  @State private var showingTour = false
+  @AppStorage(SirenSettings.tourSeen) private var tourSeen = false
   @State private var showingServerList = false
   @State private var didCheckStartup = false
   @State private var isKeyboardVisible = false
@@ -59,7 +61,11 @@ struct SirenLiveRoot: View {
       .miniPlayerSheets(isEnabled: !playerManager.isShowingFullPlayer && !playerManager.isReaderOpen)
       .handleDeepLinks()
       .fullScreenCover(isPresented: $showingOnboarding) {
-        OnboardingView(model: OnboardingViewModel())
+        SirenTour(ending: .connect)
+          .displayScaled()
+      }
+      .fullScreenCover(isPresented: $showingTour) {
+        SirenTour(ending: .done)
           .displayScaled()
       }
       .sheet(isPresented: $showingServerList) {
@@ -104,7 +110,8 @@ struct SirenLiveRoot: View {
       }
   }
 
-  /// First launch goes to onboarding; a signed-out or library-less server opens the server list.
+  /// First launch goes to the tour and on to sign-in; a signed-out or library-less server opens
+  /// the server list. Someone already signed in sees the tour once (not on a kids profile).
   private func checkStartup() {
     guard !didCheckStartup else { return }
     didCheckStartup = true
@@ -112,6 +119,8 @@ struct SirenLiveRoot: View {
       showingOnboarding = true
     } else if !authentication.isAuthenticated || libraries.current == nil {
       showingServerList = true
+    } else if !tourSeen, !profiles.isKidsActive {
+      showingTour = true
     }
   }
 

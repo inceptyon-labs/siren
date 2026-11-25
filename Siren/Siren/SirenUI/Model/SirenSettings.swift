@@ -30,4 +30,6 @@ enum SirenSettings {
   static let trimSilenceSaved = "siren.player.trimSilenceSaved"
   /// "Previously on" recaps when you come back to a book (on unless turned off).
   static let recaps = "siren.player.recaps"
+  /// The welcome tour has been seen (or skipped) on this device.
+  static let tourSeen = "siren.tour.seen"
 }
