@@ -22,7 +22,14 @@ public struct AudibleSeriesList: Codable, Sendable, Hashable {
       return date
     }
 
-    public var isUpcoming: Bool { releaseDate.map { $0 > .now } ?? false }
+    /// Not out yet: a future date, or Audible's "unknown" placeholder.
+    public var isUpcoming: Bool { isDateUnknown || (releaseDate.map { $0 > .now } ?? false) }
+
+    /// Audible lists it with its placeholder date: announced, but not when.
+    public var isDateUnknown: Bool {
+      guard let text = product.releaseDate, let date = AudibleSeries.dayFormat.date(from: text) else { return false }
+      return date >= AudibleSeries.unknownDate
+    }
   }
 }
 
@@ -62,7 +69,9 @@ public final class AudibleSeries {
   private let cacheFile = URL.cachesDirectory.appending(path: "audible-series.json")
 
   private init() {
-    if let data = try? Data(contentsOf: cacheFile), let saved = try? JSONDecoder().decode(Cache.self, from: data) {
+    if let data = try? Data(contentsOf: cacheFile), var saved = try? JSONDecoder().decode(Cache.self, from: data) {
+      saved.seriesOf = saved.seriesOf.filter { $0.value.isFresh(Self.seriesOfAge) }
+      saved.series = saved.series.filter { $0.value.isFresh(Self.seriesAge) }
       cache = saved
     }
   }
@@ -113,13 +122,15 @@ public final class AudibleSeries {
       let response = try? AudibleCatalog.decoder().decode(Response.self, from: data)
     else { return nil }
     let all = response.product.series ?? []
-    let wanted = name.map(Self.normalized)
+    // In one series: that's it. In several (a saga inside a universe): the one named like
+    // Audiobookshelf's, or none rather than a guess.
+    if all.count == 1 { return all[0].asin }
+    guard let wanted = name.map(Self.normalized), wanted.count >= 3 else { return "" }
     let named = all.first { ref in
-      guard let wanted, !wanted.isEmpty, let title = ref.title.map(Self.normalized) else { return false }
+      guard let title = ref.title.map(Self.normalized), title.count >= 3 else { return false }
       return title == wanted || title.contains(wanted) || wanted.contains(title)
     }
-    let numbered = all.first { !($0.sequence ?? "").isEmpty }
-    return (named ?? numbered ?? all.first)?.asin ?? ""
+    return named?.asin ?? ""
   }
 
   private func loadSeries(_ asin: String) async -> AudibleSeriesList? {
@@ -156,7 +167,7 @@ public final class AudibleSeries {
     }
 
     var products: [AudibleProduct] = []
-    let asins = Array(sequenceOf.keys)
+    let asins = sequenceOf.keys.sorted()
     for start in stride(from: 0, to: asins.count, by: 50) {
       guard let batch = await AudibleProducts.lookup(Array(asins[start..<min(start + 50, asins.count)])) else {
         return nil
@@ -170,7 +181,11 @@ public final class AudibleSeries {
       guard let sequence = sequenceOf[product.asin], let position = Double(sequence) else { continue }
       let book = AudibleSeriesList.Book(product: product, sequence: sequence)
       let key = String(position)
-      if let current = best[key], Self.rank(current) >= Self.rank(book) { continue }
+      // Ties go to the lower ASIN, so the same edition wins every time.
+      if let current = best[key] {
+        let (kept, new) = (Self.rank(current), Self.rank(book))
+        if (kept.0, kept.1, book.product.asin) >= (new.0, new.1, current.product.asin) { continue }
+      }
       best[key] = book
     }
     let books = best.values.sorted { $0.position < $1.position }

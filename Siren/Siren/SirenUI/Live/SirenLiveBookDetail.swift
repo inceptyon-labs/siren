@@ -95,7 +95,9 @@ struct SirenLiveBookDetail: View {
         audibleSeries = nil
         return
       }
-      audibleSeries = await AudibleSeries.shared.series(ofBook: asin, named: name)
+      let found = await AudibleSeries.shared.series(ofBook: asin, named: name)
+      guard !Task.isCancelled else { return }
+      audibleSeries = found
     }
     .sirenRequestDialog(
       for: Binding(get: { requesting?.product }, set: { if $0 == nil { requesting = nil } }),
@@ -332,7 +334,7 @@ struct SirenLiveBookDetail: View {
         HStack(alignment: .top, spacing: 14) {
           ForEach(seriesEntries) { entry in
             switch entry {
-            case .owned(let item): seriesItem(item)
+            case .owned(let item, _): seriesItem(item)
             case .audible(let member): audibleSeriesItem(member)
             }
           }

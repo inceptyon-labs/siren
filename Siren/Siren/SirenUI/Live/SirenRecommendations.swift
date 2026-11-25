@@ -226,7 +226,10 @@ final class SirenRecommendations {
     }
     shownKey = key
     upcoming = found.values
-      .sorted { ($0.book.releaseDate ?? .distantFuture) < ($1.book.releaseDate ?? .distantFuture) }
+      .sorted {
+        ($0.book.releaseDate ?? .distantFuture, $0.book.product.title)
+          < ($1.book.releaseDate ?? .distantFuture, $1.book.product.title)
+      }
       .prefix(Self.shelfSize)
       .map { $0 }
   }

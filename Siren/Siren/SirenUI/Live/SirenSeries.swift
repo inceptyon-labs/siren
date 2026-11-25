@@ -4,12 +4,14 @@ import SwiftUI
 
 /// One place in a series: a book in the library, or one only Audible has (missing or upcoming).
 enum SirenSeriesEntry: Identifiable {
-  case owned(SirenBook)
+  /// `isNumbered` is false for library books with no position (box sets, companions): they're
+  /// listed, but never "next".
+  case owned(SirenBook, isNumbered: Bool)
   case audible(AudibleSeriesList.Book)
 
   var id: String {
     switch self {
-    case .owned(let book): book.id
+    case .owned(let book, _): book.id
     case .audible(let book): "audible-\(book.id)"
     }
   }
@@ -25,7 +27,7 @@ enum SirenSeriesEntry: Identifiable {
           ($0.element.sequence.flatMap(Double.init) ?? .infinity, $0.offset)
             < ($1.element.sequence.flatMap(Double.init) ?? .infinity, $1.offset)
         }
-        .map { .owned($0.element.book) }
+        .map { .owned($0.element.book, isNumbered: $0.element.sequence.flatMap(Double.init) != nil) }
     }
     var unmatched = owned
     var placed: [(entry: Self, position: Double)] = []
@@ -36,13 +38,14 @@ enum SirenSeriesEntry: Identifiable {
         ?? unmatched.firstIndex { SirenText.matchKey($0.book.title) == title }
         ?? unmatched.firstIndex { $0.sequence.flatMap(Double.init) == member.position }
       if let match {
-        placed.append((.owned(unmatched.remove(at: match).book), member.position))
+        placed.append((.owned(unmatched.remove(at: match).book, isNumbered: true), member.position))
       } else {
         placed.append((.audible(member), member.position))
       }
     }
     for leftover in unmatched {
-      placed.append((.owned(leftover.book), leftover.sequence.flatMap(Double.init) ?? .infinity))
+      let position = leftover.sequence.flatMap(Double.init)
+      placed.append((.owned(leftover.book, isNumbered: position != nil), position ?? .infinity))
     }
     // Stable: equal positions keep Audible's order.
     return placed.enumerated()
@@ -68,8 +71,9 @@ extension SirenRequests {
 }
 
 extension AudibleSeriesList.Book {
-  /// "Out Mar 4", or nil once it's out.
+  /// "Out Mar 4", "Date TBA", or nil once it's out.
   var outLabel: String? {
+    if isDateUnknown { return String(localized: "Date TBA") }
     guard isUpcoming, let releaseDate else { return nil }
     return String(localized: "Out \(releaseDate.formatted(.dateTime.month(.abbreviated).day()))")
   }
@@ -175,7 +179,7 @@ struct SirenNextInSeriesCard: View {
 
   private var book: SirenBook {
     switch next {
-    case .owned(let book): book
+    case .owned(let book, _): book
     case .audible(let member): SirenBook(audible: member.product)
     }
   }
@@ -207,7 +211,7 @@ struct SirenNextInSeriesCard: View {
 
   private var detail: String {
     switch next {
-    case .owned(let book):
+    case .owned(let book, _):
       if book.isStarted { return String(localized: "\(Int((book.progress * 100).rounded()))% listened") }
       return String(localized: "In your library")
     case .audible(let member):
@@ -220,7 +224,7 @@ struct SirenNextInSeriesCard: View {
 
   @ViewBuilder private var action: some View {
     switch next {
-    case .owned(let book):
+    case .owned(let book, _):
       Button("Play") {
         onPlay()
         Task { await PlayerManager.shared.play(book.id) }
@@ -268,20 +272,17 @@ enum SirenSeriesResolver {
   /// A book's position in a series, from Audiobookshelf's "Name #1, Other #2". (Its filtered
   /// list carries the position elsewhere, in a field upstream's model doesn't read.)
   static func sequence(in seriesName: String?, of name: String) -> String? {
-    guard let seriesName else { return nil }
-    for part in seriesName.components(separatedBy: ", ") {
-      guard part.hasPrefix("\(name) #") else { continue }
-      let sequence = part.dropFirst(name.count + 2).trimmingCharacters(in: .whitespaces)
-      return sequence.isEmpty ? nil : sequence
-    }
-    return nil
+    // Searched for, not split on ", ": a series name can contain one ("Dresden Files, The").
+    guard let seriesName, let range = seriesName.range(of: "\(name) #") else { return nil }
+    let sequence = seriesName[range.upperBound...].prefix { $0.isNumber || $0 == "." }
+    return sequence.isEmpty ? nil : String(sequence)
   }
 
   /// The next place after this book you haven't finished, owned or not.
   static func next(after bookID: String, in entries: [SirenSeriesEntry]) -> SirenSeriesEntry? {
     guard let index = entries.firstIndex(where: { $0.id == bookID }) else { return nil }
     return entries[(index + 1)...].first { entry in
-      if case .owned(let book) = entry { return !book.isFinished }
+      if case .owned(let book, let isNumbered) = entry { return isNumbered && !book.isFinished }
       return true
     }
   }
@@ -307,18 +308,21 @@ final class SirenEndOfBook {
   /// Called by upstream's player when a book ends with nothing to continue to.
   func bookFinished(_ bookID: String) {
     let profile = SirenProfiles.shared.activeID
+    let library = Audiobookshelf.shared.libraries.current?.id
     Task {
       guard let found = await SirenSeriesResolver.entries(bookID: bookID),
         let next = SirenSeriesResolver.next(after: bookID, in: found.entries)
       else { return }
       let title = found.entries.compactMap { entry -> String? in
-        if case .owned(let book) = entry, book.id == bookID { return book.title }
+        if case .owned(let book, _) = entry, book.id == bookID { return book.title }
         return nil
       }.first
       // Let the player's sheet finish closing first.
       try? await Task.sleep(for: .milliseconds(600))
-      // Someone else's book isn't theirs to play or request.
-      guard SirenProfiles.shared.activeID == profile else { return }
+      // Someone else's book isn't theirs to play or request, and a book started meanwhile wins.
+      guard SirenProfiles.shared.activeID == profile, Audiobookshelf.shared.libraries.current?.id == library,
+        PlayerManager.shared.current == nil
+      else { return }
       card = Card(finishedTitle: title ?? "", series: found.name, next: next)
     }
   }
