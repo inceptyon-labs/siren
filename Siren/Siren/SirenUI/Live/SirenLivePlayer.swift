@@ -42,7 +42,7 @@ struct SirenLivePlayer: View {
       UIApplication.shared.isIdleTimerDisabled = newValue
     }
     .overlay(alignment: .top) {
-      if let recap = recaps.pending, recap.bookID == model.id {
+      if recapsOn, let recap = recaps.pending, recap.bookID == model.id {
         // Inside the art, which is inset 24 pt and starts 28 pt down.
         SirenRecapCard(recap: recap)
           .padding(.horizontal, 36)

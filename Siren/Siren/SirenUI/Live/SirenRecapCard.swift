@@ -63,7 +63,8 @@ final class SirenRecapSpeaker: NSObject, AVSpeechSynthesizerDelegate {
 
   private(set) var isSpeaking = false
   @ObservationIgnored private let synthesizer = AVSpeechSynthesizer()
-  @ObservationIgnored private var resumesBook = false
+  /// The player paused for the reading, resumed after it only if it's still the one playing.
+  @ObservationIgnored private weak var pausedPlayer: BookPlayer.Model?
 
   override private init() {
     super.init()
@@ -73,7 +74,7 @@ final class SirenRecapSpeaker: NSObject, AVSpeechSynthesizerDelegate {
   func speak(_ text: String, language: String?) {
     if let player = PlayerManager.shared.current, player.isPlaying {
       player.onPauseTapped()
-      resumesBook = true
+      pausedPlayer = player
     }
     let utterance = AVSpeechUtterance(string: text)
     utterance.voice = BookLanguage.code(for: language).flatMap { AVSpeechSynthesisVoice(language: $0) }
@@ -88,8 +89,10 @@ final class SirenRecapSpeaker: NSObject, AVSpeechSynthesizerDelegate {
 
   private func finished() {
     isSpeaking = false
-    if resumesBook { PlayerManager.shared.current?.onPlayTapped() }
-    resumesBook = false
+    if let pausedPlayer, PlayerManager.shared.current === pausedPlayer, !pausedPlayer.isPlaying {
+      pausedPlayer.onPlayTapped()
+    }
+    pausedPlayer = nil
   }
 
   nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {

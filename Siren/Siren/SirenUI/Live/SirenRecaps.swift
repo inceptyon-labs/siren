@@ -1,3 +1,4 @@
+import API
 import AVFoundation
 import Foundation
 import FoundationModels
@@ -14,6 +15,8 @@ final class SirenRecaps {
   static let shared = SirenRecaps()
 
   struct Recap: Identifiable, Equatable {
+    /// The sign-in (household profile) it belongs to.
+    let scope: String
     let bookID: String
     let title: String
     /// Oldest first.
@@ -38,6 +41,14 @@ final class SirenRecaps {
   private struct Log: Codable {
     var lastPlayed: Date?
     var segments: [Segment] = []
+    /// Where listening not yet summarized began, kept across pauses.
+    var unsummarizedFrom: Double?
+  }
+
+  /// One person's copy of a book: profiles on the same server share book IDs.
+  private struct Key: Hashable {
+    let scope: String
+    let bookID: String
   }
 
   private struct Segment: Codable {
@@ -50,11 +61,13 @@ final class SirenRecaps {
   private static let segment: TimeInterval = 600
 
   @ObservationIgnored private var timer: Timer?
-  /// The book playing at the last step, and where it was when it started.
-  @ObservationIgnored private var playing: (bookID: String, from: Double)?
-  @ObservationIgnored private var logs: [String: Log] = [:]
+  /// The book playing at the last step.
+  @ObservationIgnored private var playing: Key?
+  /// A book you came back to with nothing saved: its recap is made now, retried until it works.
+  @ObservationIgnored private var owed: Key?
+  @ObservationIgnored private var logs: [Key: Log] = [:]
   @ObservationIgnored private var isSummarizing = false
-  @ObservationIgnored private var failedAt: [String: Date] = [:]
+  @ObservationIgnored private var failedAt: [Key: Date] = [:]
   @ObservationIgnored private var savedAt = Date.distantPast
   @ObservationIgnored private let folder = URL.applicationSupportDirectory.appending(
     path: "siren-recaps",
@@ -62,6 +75,11 @@ final class SirenRecaps {
   )
 
   private init() {}
+
+  /// The signed-in connection, so each profile keeps its own recaps.
+  private static var scope: String? {
+    Audiobookshelf.shared.authentication.server.map { "\($0.id)" }
+  }
 
   func start() {
     guard timer == nil else { return }
@@ -74,55 +92,73 @@ final class SirenRecaps {
 
   func dismiss() {
     pending = nil
+    owed = nil
   }
 
   private func step() {
-    guard Self.isOn, Self.isSupported, let player = PlayerManager.shared.current, player.podcastID == nil,
-      player.isPlaying
+    guard Self.isOn else { return dismiss() }
+    guard Self.isSupported, let scope = Self.scope, let player = PlayerManager.shared.current,
+      player.podcastID == nil
     else {
       playing = nil
       return
     }
-    let bookID = player.id
+    if pending.map({ $0.scope != scope }) == true { pending = nil }
+    guard player.isPlaying else {
+      playing = nil
+      return
+    }
+    let key = Key(scope: scope, bookID: player.id)
     let now = Date()
     let position = player.playbackProgress.totalProgress * player.playbackProgress.total
-    var log = log(bookID)
+    var log = log(key)
 
-    if playing?.bookID != bookID {
+    if playing != key {
       // Just started, or came back to, this book.
-      playing = (bookID, position)
-      if pending?.bookID != bookID { pending = nil }
+      playing = key
+      if pending?.bookID != key.bookID { pending = nil }
+      owed = nil
       if let last = log.lastPlayed, now.timeIntervalSince(last) >= Self.away {
         let heard = log.segments.filter { $0.end <= position + 60 }.sorted { $0.end < $1.end }.suffix(3)
         if heard.last.map({ position - $0.end < Self.segment * 2 }) == true {
-          let language = (try? LocalBook.fetch(bookID: bookID))?.language
-          pending = Recap(bookID: bookID, title: player.title, summaries: heard.map(\.summary), language: language)
+          let language = (try? LocalBook.fetch(bookID: key.bookID))?.language
+          pending = Recap(
+            scope: scope,
+            bookID: key.bookID,
+            title: player.title,
+            summaries: heard.map(\.summary),
+            language: language
+          )
         } else if position >= 120 {
-          summarize(bookID, from: max(position - Self.segment, 0), to: position, show: player.title)
+          owed = key
         }
       }
     }
-
-    log.lastPlayed = now
-    logs[bookID] = log
-    if now.timeIntervalSince(savedAt) > 60 {
-      save(bookID)
-      savedAt = now
+    if owed == key {
+      summarize(key, from: max(position - Self.segment, 0), to: position, show: player.title)
     }
 
     // Each ten minutes heard, summarized (at most the last fifteen, after a jump ahead).
-    let covered = log.segments.map(\.end).filter { $0 <= position + 1 }.max() ?? playing?.from ?? position
+    let summarized = log.segments.map(\.end).filter { $0 <= position + 1 }.max()
+    if summarized == nil { log.unsummarizedFrom = min(log.unsummarizedFrom ?? position, position) }
+    log.lastPlayed = now
+    logs[key] = log
+    if now.timeIntervalSince(savedAt) > 60 {
+      save(key)
+      savedAt = now
+    }
+    let covered = summarized ?? log.unsummarizedFrom ?? position
     if position - covered >= Self.segment {
-      summarize(bookID, from: max(covered, position - Self.segment * 1.5), to: position, show: nil)
+      summarize(key, from: max(covered, position - Self.segment * 1.5), to: position, show: nil)
     }
   }
 
   /// Transcribes and summarizes `start` to `end` of a downloaded book, then shows the recap if
-  /// `title` is set.
-  private func summarize(_ bookID: String, from start: Double, to end: Double, show title: String?) {
+  /// `title` is set and the book is still playing for the same person.
+  private func summarize(_ key: Key, from start: Double, to end: Double, show title: String?) {
     guard #available(iOS 26.0, *), !isSummarizing,
-      failedAt[bookID].map({ Date().timeIntervalSince($0) > Self.segment }) ?? true,
-      let book = try? LocalBook.fetch(bookID: bookID),
+      failedAt[key].map({ Date().timeIntervalSince($0) > Self.segment }) ?? true,
+      let book = try? LocalBook.fetch(bookID: key.bookID),
       let source = NarrationSource(downloaded: book.tracks)
     else { return }
     isSummarizing = true
@@ -134,18 +170,21 @@ final class SirenRecaps {
         text.split(separator: " ").count >= 40,
         let summary = await Self.summary(of: text, title: bookTitle)
       else {
-        failedAt[bookID] = Date()
+        failedAt[key] = Date()
         return
       }
-      var log = log(bookID)
+      var log = log(key)
       log.segments.removeAll { $0.start < end && start < $0.end }
       log.segments.append(Segment(start: start, end: end, summary: summary))
       log.segments.sort { $0.end < $1.end }
       log.segments = Array(log.segments.suffix(24))
-      logs[bookID] = log
-      save(bookID)
-      if let title, PlayerManager.shared.current?.id == bookID {
-        pending = Recap(bookID: bookID, title: title, summaries: [summary], language: language)
+      log.unsummarizedFrom = nil
+      logs[key] = log
+      save(key)
+      guard let title, owed == key else { return }
+      owed = nil
+      if Self.isOn, Self.scope == key.scope, PlayerManager.shared.current?.id == key.bookID {
+        pending = Recap(scope: key.scope, bookID: key.bookID, title: title, summaries: [summary], language: language)
       }
     }
   }
@@ -205,21 +244,26 @@ final class SirenRecaps {
 
   // MARK: Storage
 
-  private func log(_ bookID: String) -> Log {
-    if let log = logs[bookID] { return log }
-    let log =
-      (try? Data(contentsOf: file(bookID))).flatMap { try? JSONDecoder().decode(Log.self, from: $0) } ?? Log()
-    logs[bookID] = log
+  private func log(_ key: Key) -> Log {
+    if let log = logs[key] { return log }
+    let log = (try? Data(contentsOf: file(key))).flatMap { try? JSONDecoder().decode(Log.self, from: $0) } ?? Log()
+    logs[key] = log
     return log
   }
 
-  private func save(_ bookID: String) {
-    guard let log = logs[bookID], let data = try? JSONEncoder().encode(log) else { return }
-    try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-    try? data.write(to: file(bookID), options: .atomic)
+  private func save(_ key: Key) {
+    guard let log = logs[key], let data = try? JSONEncoder().encode(log) else { return }
+    let file = file(key)
+    try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try? data.write(to: file, options: .atomic)
   }
 
-  private func file(_ bookID: String) -> URL {
-    folder.appending(path: bookID.map { $0.isLetter || $0.isNumber || $0 == "-" ? String($0) : "_" }.joined() + ".json")
+  private func file(_ key: Key) -> URL {
+    func safe(_ text: String) -> String {
+      text.map { $0.isLetter || $0.isNumber || $0 == "-" ? String($0) : "_" }.joined()
+    }
+    return folder.appending(path: safe(key.scope), directoryHint: .isDirectory).appending(
+      path: safe(key.bookID) + ".json"
+    )
   }
 }
