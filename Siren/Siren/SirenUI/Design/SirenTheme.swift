@@ -87,7 +87,9 @@ struct StarRating: View {
       }
     }
     .accessibilityElement(children: .ignore)
-    .accessibilityLabel("Rated \(rating, specifier: "%.1f") from \(count) ratings")
+    .accessibilityLabel(
+      count > 0 ? "Rated \(rating, specifier: "%.1f") from \(count) ratings" : "Rated \(rating, specifier: "%.1f")"
+    )
   }
 }
 

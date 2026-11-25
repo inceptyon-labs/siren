@@ -46,6 +46,7 @@ extension View {
       case .book(let id): SirenLiveBookDetail(bookID: id)
       case .progressArt: SirenProgressArtSettingsView()
       case .profiles: SirenProfilesView()
+      case .requests: SirenRequestsSettingsView()
       }
     }
   }

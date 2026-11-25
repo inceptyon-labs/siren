@@ -198,7 +198,7 @@ struct SirenRequestSearchView: View {
 
 /// Filled for a book you can request now; tinted for Play and for books not yet released.
 /// Draws 30pt tall and keeps a 44pt hit area.
-private struct RequestSearchCapsuleStyle: ButtonStyle {
+struct RequestSearchCapsuleStyle: ButtonStyle {
   var filled: Bool
 
   func makeBody(configuration: Configuration) -> some View {

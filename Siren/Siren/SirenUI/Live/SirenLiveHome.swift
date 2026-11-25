@@ -65,6 +65,8 @@ struct SirenLiveHome: View {
           goalCard
         }
 
+        SirenRequestsShelf(refreshID: sentRefresh)
+
         if let username = authentication.server?.username, let libraryID = libraries.current?.id {
           SirenSentShelf(username: username, libraryID: libraryID, refreshID: sentRefresh) { open($0.id) }
             .id("\(libraryID)/\(username)")
@@ -349,6 +351,9 @@ struct SirenLiveHome: View {
           }
           Button("Downloads", systemImage: "arrow.down.circle") {
             router.homePath.append(NavigationDestination.offline)
+          }
+          Button("Book Requests", systemImage: "tray.and.arrow.down") {
+            router.homePath.append(SirenRoute.requests)
           }
         }
         if isAdmin {

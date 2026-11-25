@@ -42,6 +42,7 @@ enum SirenRoute: Hashable {
   case book(String)
   case progressArt
   case profiles
+  case requests
 }
 
 /// Demo screens with `-SirenDemo`, upstream's screens for podcast libraries, Siren's otherwise.
@@ -200,7 +201,7 @@ struct SirenDemoRoot: View {
       )
     case .progressArt:
       SirenProgressArtSettingsView()
-    case .profiles:
+    case .profiles, .requests:
       EmptyView()
     }
   }
