@@ -221,11 +221,11 @@ private struct NarrationSpeedCard: View {
           HStack(alignment: .firstTextBaseline, spacing: 2) {
             Text(speed, format: .number.precision(.fractionLength(2)))
               .font(.system(size: 44, weight: .bold))
-              .foregroundStyle(Color.accentColor)
+              .foregroundStyle(SirenTheme.ink)  // SIREN: teal is for what can be pressed
             Text(verbatim: "×")
               .font(.title3)
               .fontWeight(.bold)
-              .foregroundStyle(Color.accentColor)
+              .foregroundStyle(SirenTheme.ink)  // SIREN: teal is for what can be pressed
           }
         }
         .accessibilityElement(children: .ignore)
@@ -240,7 +240,8 @@ private struct NarrationSpeedCard: View {
         }
         Spacer()
         VStack(spacing: 8) {
-          stepperButton(systemImage: "plus", tint: Color.accentColor, foreground: .white) {
+          // SIREN: Siren tint
+          stepperButton(systemImage: "plus", tint: SirenTheme.tint, foreground: SirenTheme.onTint) {
             speed = min(3.5, (speed + 0.05).rounded(toPlaces: 2))
           }
           stepperButton(systemImage: "minus", tint: Color.gray.opacity(0.15), foreground: .primary) {
@@ -269,12 +270,12 @@ private struct NarrationSpeedCard: View {
       Text(value, format: .number.precision(.fractionLength(2)))
         .font(.subheadline)
         .fontWeight(.semibold)
-        .foregroundStyle(isSelected ? Color.white : Color.primary)
+        .foregroundStyle(isSelected ? SirenTheme.onTint : SirenTheme.ink)  // SIREN: Siren tint
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
         .background(
           RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .fill(isSelected ? Color.black : Color.gray.opacity(0.12))
+            .fill(isSelected ? SirenTheme.tint : Color.gray.opacity(0.12))  // SIREN: Siren tint
         )
         .contentShape(.rect)
     }

@@ -33,28 +33,26 @@ struct PreferenceRow: View {
   }
 
   var body: some View {
-    HStack(spacing: 12) {
-      RoundedRectangle(cornerRadius: 10)
-        .fill(tint.opacity(0.15))
-        .frame(width: 34, height: 34)
-        .overlay(
-          Image(systemName: systemImage)
-            .font(.system(size: 16, weight: .semibold))
-            .foregroundStyle(tint)
-        )
+    // SIREN: neutral glyphs and Siren's row type in place of coloured tiles (`tint` is unused)
+    HStack(spacing: 14) {
+      Image(systemName: systemImage)
+        .font(.body)
+        .foregroundStyle(SirenTheme.secondary)
+        .frame(width: 26)
         .accessibilityHidden(true)
 
       VStack(alignment: .leading, spacing: 2) {
         title
-          .font(.subheadline)
-          .fontWeight(.medium)
+          .font(.body)
+          .foregroundStyle(SirenTheme.ink)
 
         if let subtitle {
           subtitle
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            .font(.footnote)
+            .foregroundStyle(SirenTheme.secondary)
         }
       }
     }
+    .padding(.vertical, 2)
   }
 }

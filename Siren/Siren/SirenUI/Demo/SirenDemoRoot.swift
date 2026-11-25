@@ -10,6 +10,7 @@ enum SirenDemoScreen: String, CaseIterable {
   case playerMap = "player-map"
   case playerVoice = "player-voice"
   case settingsArt = "settings-art"
+  case settings
   case tour
   case tourCovers = "tour-covers"
   case tourPlayer = "tour-player"
@@ -70,6 +71,8 @@ struct SirenRootSwitch: View {
   @ViewBuilder private var root: some View {
     if let page = SirenDemoScreen.requested?.tourPage {
       SirenTour(ending: .connect, startPage: page)
+    } else if SirenDemoScreen.requested == .settings {
+      SettingsView(model: SettingsViewModel()).tint(SirenTheme.tint)
     } else if let screen = SirenDemoScreen.requested {
       SirenDemoRoot(screen: screen)
     } else {
@@ -164,7 +167,7 @@ struct SirenDemoRoot: View {
     case .playerMap: open(.map)
     case .playerVoice: open(.voice)
     case .settingsArt: homePath = [.progressArt]
-    case .tour, .tourCovers, .tourPlayer: break  // SirenRootSwitch shows the tour itself.
+    case .tour, .tourCovers, .tourPlayer, .settings: break  // SirenRootSwitch shows these itself.
     }
   }
 
