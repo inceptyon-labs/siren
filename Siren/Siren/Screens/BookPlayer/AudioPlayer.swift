@@ -30,6 +30,9 @@ final class AudioPlayer {
   private let player = AVQueuePlayer()
   private let eqContext = EQContext()
   private var eqEnabled = false
+  // SIREN: voice boost runs on the equalizer's tap, with or without the equalizer
+  private var voiceBoost = false
+  private var needsTap: Bool { eqEnabled || voiceBoost }
   private let mediaProgress: MediaProgress
   private var session: PlaybackSession
   private var tracks: [Track] = []
@@ -96,6 +99,8 @@ final class AudioPlayer {
     player.allowsExternalPlayback = false
     player.automaticallyWaitsToMinimizeStalling = false
     setupObservers()
+    // SIREN: voice boost follows its setting
+    SirenVoiceBoost.changes.sink { [weak self] in self?.setVoiceBoost($0) }.store(in: &cancellables)
   }
 
   deinit {
@@ -281,7 +286,8 @@ private extension AudioPlayer {
   }
 
   func applyEQToUpcoming() {
-    guard eqEnabled else { return }
+    // SIREN: voice boost needs the tap too
+    guard needsTap else { return }
     Task { [weak self] in await self?.attachEQ() }
   }
 
@@ -490,9 +496,26 @@ extension AudioPlayer {
 
   func setEQEnabled(_ enabled: Bool) {
     guard eqEnabled != enabled else { return }
+    // SIREN: the tap stays on while voice boost needs it
+    let hadTap = needsTap
     eqEnabled = enabled
+    eqContext.setEQEnabled(enabled)
+    updateTap(hadTap: hadTap)
+  }
 
-    guard player.currentItem != nil else { return }
+  // SIREN: voice boost
+  func setVoiceBoost(_ on: Bool) {
+    guard voiceBoost != on else { return }
+    let hadTap = needsTap
+    voiceBoost = on
+    eqContext.setVoiceBoost(on)
+    updateTap(hadTap: hadTap)
+  }
+
+  // SIREN: attaches or removes the tap when whether it's needed changes
+  private func updateTap(hadTap: Bool) {
+    let enabled = needsTap
+    guard enabled != hadTap, player.currentItem != nil else { return }
 
     let time = mediaProgress.currentTime
     Task { [weak self] in
@@ -518,12 +541,15 @@ extension AudioPlayer {
     private var outputBuffer: AVAudioPCMBuffer?
     private var inputBufferList: UnsafeMutablePointer<AudioBufferList>?
     var levelingStrength: LevelingStrength = .off {
-      didSet { compressor?.bypass = levelingStrength == .off }
+      didSet { compressor?.bypass = effectiveLeveling == .off }
     }
     var preamp: Float = 0
     var bandGains: [Float]
+    // SIREN: voice boost adds its own bands and leveling; the equalizer's apply only while it's on
+    private var eqEnabled = false
+    private(set) var voiceBoost = false
 
-    var eqHasEffect: Bool { preamp != 0 || bandGains.contains { $0 != 0 } }
+    var eqHasEffect: Bool { eqEnabled && (preamp != 0 || bandGains.contains { $0 != 0 }) }
 
     init() {
       bandGains = [Float](repeating: 0, count: Self.bandFrequencies.count)
@@ -533,18 +559,18 @@ extension AudioPlayer {
       unprepare()
 
       let newEngine = AVAudioEngine()
-      let newEQ = AVAudioUnitEQ(numberOfBands: Self.bandFrequencies.count)
+      // SIREN: plus voice boost's bands
+      let newEQ = AVAudioUnitEQ(numberOfBands: Self.bandFrequencies.count + SirenVoiceBoost.bandCount)
 
-      newEQ.globalGain = preamp
-      newEQ.bypass = !eqHasEffect
       for (i, freq) in Self.bandFrequencies.enumerated() {
         let band = newEQ.bands[i]
         band.filterType = .parametric
         band.frequency = freq
         band.bandwidth = 1.0
-        band.gain = bandGains[i]
         band.bypass = false
       }
+      // SIREN: voice boost's bands
+      SirenVoiceBoost.configure(Array(newEQ.bands[Self.bandFrequencies.count...]))
 
       let newCompressor = AVAudioUnitEffect(
         audioComponentDescription: AudioComponentDescription(
@@ -555,7 +581,7 @@ extension AudioPlayer {
           componentFlagsMask: 0
         )
       )
-      newCompressor.bypass = levelingStrength == .off
+      newCompressor.bypass = effectiveLeveling == .off
 
       let srcNode = AVAudioSourceNode(format: format) { [weak self] _, _, _, audioBufferList in
         guard let self, let input = self.inputBufferList else { return noErr }
@@ -584,6 +610,8 @@ extension AudioPlayer {
         self.eq = newEQ
         self.compressor = newCompressor
         self.sourceNode = srcNode
+        // SIREN: gains and bypass from the current settings
+        applyBands()
         applyLevelingParameters()
       } catch {
         AppLogger.player.error("EQ engine setup failed: \(error)")
@@ -624,15 +652,50 @@ extension AudioPlayer {
 
     func setPreamp(_ value: Float) {
       preamp = value
-      eq?.globalGain = value
-      eq?.bypass = !eqHasEffect
+      // SIREN: gains apply through applyBands
+      applyBands()
     }
 
     func setBandGain(_ index: Int, gain: Float) {
       guard index < bandGains.count else { return }
       bandGains[index] = gain
-      eq?.bands[index].gain = gain
-      eq?.bypass = !eqHasEffect
+      // SIREN: gains apply through applyBands
+      applyBands()
+    }
+
+    // SIREN: voice boost
+    func setEQEnabled(_ enabled: Bool) {
+      eqEnabled = enabled
+      applyBands()
+      applyLevelingParameters()
+    }
+
+    // SIREN: voice boost
+    func setVoiceBoost(_ on: Bool) {
+      voiceBoost = on
+      applyBands()
+      applyLevelingParameters()
+    }
+
+    // SIREN: the equalizer's gains while it's on (flat otherwise), and voice boost's bands while
+    // that's on
+    private func applyBands() {
+      guard let eq else { return }
+      eq.globalGain = eqEnabled ? preamp : 0
+      for (i, gain) in bandGains.enumerated() {
+        eq.bands[i].gain = eqEnabled ? gain : 0
+      }
+      for band in eq.bands[bandGains.count...] {
+        band.bypass = !voiceBoost
+      }
+      eq.bypass = !eqHasEffect && !voiceBoost
+    }
+
+    // SIREN: the equalizer's leveling while it's on, at least medium with voice boost
+    private var effectiveLeveling: LevelingStrength {
+      let chosen = eqEnabled ? levelingStrength : .off
+      guard voiceBoost, chosen.rawValue < SirenVoiceBoost.leveling.rawValue else { return chosen }
+      return SirenVoiceBoost.leveling
     }
 
     func setLevelingStrength(_ strength: LevelingStrength) {
@@ -641,7 +704,9 @@ extension AudioPlayer {
     }
 
     private func applyLevelingParameters() {
-      guard let unit = compressor?.audioUnit, let params = levelingStrength.parameters else { return }
+      // SIREN: effective leveling (voice boost)
+      compressor?.bypass = effectiveLeveling == .off
+      guard let unit = compressor?.audioUnit, let params = effectiveLeveling.parameters else { return }
       AudioUnitSetParameter(unit, kDynamicsProcessorParam_Threshold, kAudioUnitScope_Global, 0, params.threshold, 0)
       AudioUnitSetParameter(unit, kDynamicsProcessorParam_HeadRoom, kAudioUnitScope_Global, 0, params.headroom, 0)
       AudioUnitSetParameter(unit, kDynamicsProcessorParam_AttackTime, kAudioUnitScope_Global, 0, params.attack, 0)

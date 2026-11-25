@@ -9,6 +9,7 @@ struct SirenLivePlayer: View {
 
   @ObservedObject private var preferences = UserPreferences.shared
   @AppStorage(SirenSettings.playerArt) private var playerArt: PlayerArt = .cover
+  @AppStorage(SirenSettings.voiceBoost) private var voiceBoost = false
   @State private var art: PlayerArt = .cover
   @State private var showingSend = false
   @ObservedObject private var authentication = Audiobookshelf.shared.authentication
@@ -64,6 +65,7 @@ struct SirenLivePlayer: View {
     }
     Button("Volume", systemImage: "speaker.wave.2") { model.volume.isPresented = true }
     Button("Equalizer", systemImage: "slider.vertical.3") { model.equalizer.isPresented = true }
+    Toggle("Voice Boost", systemImage: "person.wave.2", isOn: $voiceBoost)
     Button("Player Settings", systemImage: "gearshape") { model.isSettingsPresented = true }
   }
 }

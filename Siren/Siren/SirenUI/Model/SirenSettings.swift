@@ -22,4 +22,6 @@ enum SirenSettings {
   static let sortByRating = "siren.library.sortByRating"
   /// Library books rated at least this on Audible (0 for any).
   static let minimumRating = "siren.library.minimumRating"
+  /// Voice boost on the player: less rumble, clearer words, an even level.
+  static let voiceBoost = "siren.player.voiceBoost"
 }
