@@ -4,7 +4,7 @@ import SwiftUI
 
 /// Launch with `-SirenDemo <screen>` to open a demo screen instead of the app.
 enum SirenDemoScreen: String, CaseIterable {
-  case home, library, book, send, request, car, household
+  case home, library, book, send, request, car, household, invite
   case homeSarah = "home-sarah"
   case playerCover = "player-cover"
   case playerMap = "player-map"
@@ -66,6 +66,7 @@ struct SirenDemoRoot: View {
   @State private var showPlayer = false
   @State private var playerArt: PlayerArt = .cover
   @State private var showCar = false
+  @State private var showInvite = false
   @State private var showSend = false
   @State private var searchText = ""
   @State private var viewer = Demo.jason
@@ -96,8 +97,23 @@ struct SirenDemoRoot: View {
           .presentationDetents([.fraction(0.75), .large])
           .presentationDragIndicator(.visible)
       }
+      .sheet(isPresented: $showInvite) {
+        NavigationStack {
+          // A made-up key: the code is only drawn, never scanned.
+          SirenInviteCode(
+            name: "sarah",
+            url: URL(
+              string: "siren://connection/"
+                + String(repeating: "eyJ1cmwiOiJodHRwOi8vMTkyLjE2OC4yLjIyMjoxMzM3OCJ9", count: 8)
+            )!,
+            host: "192.168.2.222:13378"
+          )
+          .navigationTitle("Invite for sarah")
+          .navigationBarTitleDisplayMode(.inline)
+        }
+      }
       .fullScreenCover(isPresented: $showCar) {
-        SirenCarModeView(onClose: { showCar = false })
+        SirenCarModeDemo(onClose: { showCar = false })
       }
   }
 
@@ -115,6 +131,7 @@ struct SirenDemoRoot: View {
       tab = .search
       searchText = "Kessling"
     case .car: showCar = true
+    case .invite: showInvite = true
     case .playerCover: open(.cover)
     case .playerMap: open(.map)
     case .playerVoice: open(.voice)

@@ -10,4 +10,6 @@ enum SirenSettings {
   static let bookGoal = "siren.goal.books"
   static let hourGoal = "siren.goal.hours"
   static let goalOnHome = "siren.goal.onHome"
+  /// Bluetooth and car audio outputs that open car mode when they connect (port names).
+  static let carDevices = "siren.car.devices"
 }

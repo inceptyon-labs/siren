@@ -22,6 +22,7 @@ struct SirenLiveHome: View {
   @State private var heroDetail: SirenBook?
   @State private var showingSettings = false
   @State private var showingServerList = false
+  @State private var showingInvite = false
 
   private struct YearGoal {
     var finished: [SirenBook]
@@ -32,6 +33,9 @@ struct SirenLiveHome: View {
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 14) {
+        if authentication.server?.status == .authenticationError {
+          signedOutBanner
+        }
         if let error = model.error {
           Text(error)
             .font(.subheadline)
@@ -90,6 +94,29 @@ struct SirenLiveHome: View {
       ServerListPage(model: ServerListModel())
         .displaySheetScaled()
     }
+    .sheet(isPresented: $showingInvite) {
+      SirenInviteView()
+    }
+  }
+
+  /// The server turned this sign-in away: a revoked invite key, or a changed password.
+  private var signedOutBanner: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      Label("Signed out", systemImage: "person.crop.circle.badge.exclamationmark")
+        .font(.headline)
+        .foregroundStyle(SirenTheme.ink)
+      Text(
+        "\(authentication.server?.alias ?? "Your server") no longer accepts this sign-in. Sign in again to keep listening."
+      )
+      .font(.subheadline)
+      .foregroundStyle(SirenTheme.secondary)
+      Button("Sign In Again") { showingServerList = true }
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(SirenTheme.tint)
+    }
+    .padding(14)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(SirenTheme.raised, in: RoundedRectangle(cornerRadius: SirenTheme.rowRadius))
   }
 
   // MARK: Continue Listening
@@ -285,6 +312,11 @@ struct SirenLiveHome: View {
           router.homePath.append(NavigationDestination.offline)
         }
       }
+      if isAdmin {
+        Section {
+          Button("Invite to Siren…", systemImage: "qrcode") { showingInvite = true }
+        }
+      }
       Section {
         Button("Servers", systemImage: "server.rack") { showingServerList = true }
         Button("Settings", systemImage: "gearshape") { showingSettings = true }
@@ -302,10 +334,11 @@ struct SirenLiveHome: View {
   /// Household plates: the server admin is slate, other listeners plum, until Phase 2 lets
   /// each member pick one.
   private var plate: Color {
-    switch authentication.server?.userType {
-    case .root, .admin: Color(sirenHex: 0x3B4A5C)
-    default: Color(sirenHex: 0x8E4A8C)
-    }
+    isAdmin ? Color(sirenHex: 0x3B4A5C) : Color(sirenHex: 0x8E4A8C)
+  }
+
+  private var isAdmin: Bool {
+    authentication.server?.userType == .root || authentication.server?.userType == .admin
   }
 
   private var initial: String {

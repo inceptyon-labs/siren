@@ -39,9 +39,30 @@ struct SirenLivePlayer: View {
   }
 
   private var playback: SirenPlayback {
+    SirenPlayback(player: model, preferences: preferences)
+  }
+
+  @ViewBuilder private var moreMenu: some View {
+    if model.podcastID == nil {
+      Button("Go to Book", systemImage: "book") { onGoToBook(model.id) }
+    }
+    Button("Car Mode", systemImage: "car") { SirenCarMode.shared.open() }
+    Button("Queue", systemImage: "list.number") { model.isQueuePresented = true }
+    if model.history != nil {
+      Button("History", systemImage: "clock.arrow.circlepath", action: model.onHistoryTapped)
+    }
+    Button("Volume", systemImage: "speaker.wave.2") { model.volume.isPresented = true }
+    Button("Equalizer", systemImage: "slider.vertical.3") { model.equalizer.isPresented = true }
+    Button("Player Settings", systemImage: "gearshape") { model.isSettingsPresented = true }
+  }
+}
+
+extension SirenPlayback {
+  /// Playback state and actions from upstream's player.
+  @MainActor init(player model: BookPlayer.Model, preferences: UserPreferences) {
     let progress = model.playbackProgress
     let chapters = model.chapters
-    return SirenPlayback(
+    self.init(
       isPlaying: model.isPlaying,
       isLoading: model.isLoading,
       position: progress.progress,
@@ -51,7 +72,7 @@ struct SirenLivePlayer: View {
       skipBack: Int(preferences.skipBackwardInterval),
       skipForward: Int(preferences.skipForwardInterval),
       speed: SirenFormat.speed(model.speed.value),
-      sleep: sleepLabel,
+      sleep: Self.sleepLabel(model.timer.current),
       canGoPreviousChapter: chapters?.canGoPreviousChapter ?? false,
       canGoNextChapter: chapters?.canGoNextChapter ?? false,
       onScrub: { value, isDragging in
@@ -71,26 +92,13 @@ struct SirenLivePlayer: View {
     )
   }
 
-  private var sleepLabel: String? {
-    switch model.timer.current {
+  private static func sleepLabel(_ timer: TimerPickerSheet.Model.Selection) -> String? {
+    switch timer {
     case .none: nil
     case .preset(let seconds), .custom(let seconds), .duration(let seconds): SirenFormat.clock(seconds)
     case .chapters(let count): count == 1 ? "End of chapter" : "\(count) chapters"
     case .atTime(let date): date.formatted(date: .omitted, time: .shortened)
     }
-  }
-
-  @ViewBuilder private var moreMenu: some View {
-    if model.podcastID == nil {
-      Button("Go to Book", systemImage: "book") { onGoToBook(model.id) }
-    }
-    Button("Queue", systemImage: "list.number") { model.isQueuePresented = true }
-    if model.history != nil {
-      Button("History", systemImage: "clock.arrow.circlepath", action: model.onHistoryTapped)
-    }
-    Button("Volume", systemImage: "speaker.wave.2") { model.volume.isPresented = true }
-    Button("Equalizer", systemImage: "slider.vertical.3") { model.equalizer.isPresented = true }
-    Button("Player Settings", systemImage: "gearshape") { model.isSettingsPresented = true }
   }
 }
 

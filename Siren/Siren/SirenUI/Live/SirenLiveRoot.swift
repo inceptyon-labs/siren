@@ -11,6 +11,7 @@ struct SirenLiveRoot: View {
   @Environment(\.scenePhase) private var scenePhase
 
   @State private var router = SirenRouter.shared
+  @State private var carMode = SirenCarMode.shared
   @State private var showingOnboarding = false
   @State private var showingServerList = false
   @State private var didCheckStartup = false
@@ -32,6 +33,11 @@ struct SirenLiveRoot: View {
           AssistedPlayer(model: current)
             .displayScaled()
             .interactiveDismissDisabled()
+        }
+      }
+      .fullScreenCover(isPresented: $carMode.isPresented) {
+        if let current = playerManager.current {
+          SirenLiveCarMode(model: current)
         }
       }
       .fullScreenCover(item: $playerManager.reader) { reader in
@@ -65,8 +71,17 @@ struct SirenLiveRoot: View {
         }
       }
       .onChange(of: scenePhase) { _, phase in
-        if phase == .active, preferences.openPlayerOnLaunch, playerManager.current != nil {
+        guard phase == .active else { return }
+        if preferences.openPlayerOnLaunch, playerManager.current != nil {
           playerManager.showFullPlayer()
+        }
+        carMode.checkRoute()
+      }
+      .onChange(of: playerManager.current?.id) { _, id in
+        if id == nil {
+          carMode.isPresented = false
+        } else {
+          carMode.checkRoute()
         }
       }
       .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
@@ -90,7 +105,9 @@ struct SirenLiveRoot: View {
 
   private func playerBinding(assisted: Bool) -> Binding<Bool> {
     Binding(
-      get: { playerManager.isShowingFullPlayer && preferences.assistedPlayer == assisted },
+      get: {
+        playerManager.isShowingFullPlayer && preferences.assistedPlayer == assisted && !carMode.isPresented
+      },
       set: { isShowing in
         if !isShowing { playerManager.hideFullPlayer() }
       }
