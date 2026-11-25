@@ -71,18 +71,20 @@ final class SirenTrimSilence {
     else { return }
     let restart = item.audioMix == nil ? Self.restart : Self.restartWithTap
     let target = pause.upperBound - Self.keepEnd
+    // The jump is in the book's seconds; the restart is real time.
+    let rate = Double(max(player.defaultRate, 0.1))
     let jump = target - time
-    guard jump >= restart + 0.3 else { return }
+    let saving = jump / rate - restart
+    guard saving >= 0.3 else { return }
 
     isJumping = true
-    let rate = Double(max(player.defaultRate, 0.1))
     item.seek(to: CMTime(seconds: target, preferredTimescale: 1000), toleranceBefore: .zero, toleranceAfter: .zero) {
       finished in
       Task { @MainActor [weak self] in
         guard let self else { return }
         isJumping = false
         guard finished else { return }
-        unsaved += max((jump - restart) / rate, 0)
+        unsaved += saving
         if unsaved >= 5 { save() }
       }
     }

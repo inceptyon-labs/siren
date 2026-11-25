@@ -173,12 +173,19 @@ final class SirenAudioScan {
     return scan
   }
 
-  /// File name and size: the same download keeps both, while the app's container path can change.
+  /// The file's path in the shared downloads container (server, book and file) and its size. The
+  /// path from there on stays put, while the container's own path can change.
   private static func key(_ file: URL) -> String? {
     guard file.isFileURL,
       let size = try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize
     else { return nil }
-    let name = file.lastPathComponent.map { $0.isLetter || $0.isNumber ? String($0) : "_" }.joined()
+    var path = file.standardizedFileURL.path
+    if let container = FileManager.default.containerURL(
+      forSecurityApplicationGroupIdentifier: "group.com.inceptyon.siren"
+    )?.standardizedFileURL.path, path.hasPrefix(container) {
+      path.removeFirst(container.count)
+    }
+    let name = path.map { $0.isLetter || $0.isNumber || $0 == "." ? String($0) : "_" }.joined()
     return "\(name)-\(size)"
   }
 }
