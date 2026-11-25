@@ -63,8 +63,15 @@ final class SirenRecaps {
   @ObservationIgnored private var timer: Timer?
   /// The book playing at the last step.
   @ObservationIgnored private var playing: Key?
-  /// A book you came back to with nothing saved: its recap is made now, retried until it works.
-  @ObservationIgnored private var owed: Key?
+  /// A book you came back to with nothing saved: the ten minutes before where you came back are
+  /// summarized now, retried until it works or the card is dismissed.
+  private struct Owed: Equatable {
+    let key: Key
+    let start: Double
+    let end: Double
+    let title: String
+  }
+  @ObservationIgnored private var owed: Owed?
   @ObservationIgnored private var logs: [Key: Log] = [:]
   @ObservationIgnored private var isSummarizing = false
   @ObservationIgnored private var failedAt: [Key: Date] = [:]
@@ -117,7 +124,7 @@ final class SirenRecaps {
       // Just started, or came back to, this book.
       playing = key
       if pending?.bookID != key.bookID { pending = nil }
-      owed = nil
+      if owed?.key != key { owed = nil }
       if let last = log.lastPlayed, now.timeIntervalSince(last) >= Self.away {
         let heard = log.segments.filter { $0.end <= position + 60 }.sorted { $0.end < $1.end }.suffix(3)
         if heard.last.map({ position - $0.end < Self.segment * 2 }) == true {
@@ -130,12 +137,12 @@ final class SirenRecaps {
             language: language
           )
         } else if position >= 120 {
-          owed = key
+          owed = Owed(key: key, start: max(position - Self.segment, 0), end: position, title: player.title)
         }
       }
     }
-    if owed == key {
-      summarize(key, from: max(position - Self.segment, 0), to: position, show: player.title)
+    if let owed, owed.key == key {
+      summarize(key, from: owed.start, to: owed.end, show: owed.title)
     }
 
     // Each ten minutes heard, summarized (at most the last fifteen, after a jump ahead).
@@ -181,7 +188,7 @@ final class SirenRecaps {
       log.unsummarizedFrom = nil
       logs[key] = log
       save(key)
-      guard let title, owed == key else { return }
+      guard let title, owed?.key == key else { return }
       owed = nil
       if Self.isOn, Self.scope == key.scope, PlayerManager.shared.current?.id == key.bookID {
         pending = Recap(scope: key.scope, bookID: key.bookID, title: title, summaries: [summary], language: language)
