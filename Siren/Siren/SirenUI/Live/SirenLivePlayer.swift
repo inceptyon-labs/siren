@@ -1,3 +1,4 @@
+import API
 import SwiftUI
 
 /// The Siren player bound to upstream's `BookPlayer.Model`. Speed, sleep, chapters, bookmarks and
@@ -9,6 +10,8 @@ struct SirenLivePlayer: View {
   @ObservedObject private var preferences = UserPreferences.shared
   @AppStorage(SirenSettings.playerArt) private var playerArt: PlayerArt = .cover
   @State private var art: PlayerArt = .cover
+  @State private var showingSend = false
+  @ObservedObject private var authentication = Audiobookshelf.shared.authentication
 
   var body: some View {
     SirenPlayerView(book: SirenBook(player: model), playback: playback, pages: pages, flags: flags, art: $art) {
@@ -24,6 +27,11 @@ struct SirenLivePlayer: View {
       UIApplication.shared.isIdleTimerDisabled = newValue
     }
     .modifier(SirenPlayerSheets(model: model))
+    .sheet(isPresented: $showingSend) {
+      SirenLiveSendSheet(book: SirenBook(player: model))
+        .presentationDetents([.fraction(0.75), .large])
+        .presentationDragIndicator(.visible)
+    }
   }
 
   /// With Map chosen the player opens on the map, and the cover is a swipe away.
@@ -45,6 +53,9 @@ struct SirenLivePlayer: View {
   @ViewBuilder private var moreMenu: some View {
     if model.podcastID == nil {
       Button("Go to Book", systemImage: "book") { onGoToBook(model.id) }
+    }
+    if model.podcastID == nil, authentication.isSirenAdmin {
+      Button("Send…", systemImage: "paperplane") { showingSend = true }
     }
     Button("Car Mode", systemImage: "car") { SirenCarMode.shared.open() }
     Button("Queue", systemImage: "list.number") { model.isQueuePresented = true }

@@ -10,8 +10,40 @@ public enum HouseholdAdmin {
     public let username: String
     public let type: UserType
     public let isActive: Bool
+    let permissions: Access?
+    let librariesAccessible: [String]?
+    let itemTagsSelected: [String]?
+
+    struct Access: Decodable, Sendable, Hashable {
+      let accessAllLibraries: Bool?
+      let accessAllTags: Bool?
+      let accessExplicitContent: Bool?
+      let selectedTagsNotAccessible: Bool?
+    }
 
     public var isAdmin: Bool { type == .root || type == .admin }
+
+    /// Whether they can see a book, by Audiobookshelf's rule: its library, explicit content, then
+    /// tags (a kids profile sees only books tagged "kids").
+    public func canSee(_ book: HouseholdSend.Book) -> Bool {
+      if permissions?.accessAllLibraries != true, !(librariesAccessible ?? []).contains(book.libraryID) {
+        return false
+      }
+      if book.isExplicit, permissions?.accessExplicitContent != true { return false }
+      guard permissions?.accessAllTags == false else { return true }
+      let selected = itemTagsSelected ?? []
+      if permissions?.selectedTagsNotAccessible == true {
+        return book.tags.allSatisfy { !selected.contains($0) }
+      }
+      return selected.contains { book.tags.contains($0) }
+    }
+  }
+
+  /// Where a member is with one book.
+  public struct Progress: Decodable, Sendable {
+    public let libraryItemId: String?
+    public let progress: Double
+    public let isFinished: Bool
   }
 
   /// Everyone on the server (`GET /api/users`).
@@ -55,6 +87,13 @@ public enum HouseholdAdmin {
       body: Body(name: name, userId: member.id)
     )
     return response.apiKey.apiKey
+  }
+
+  /// A member's listening progress on every book they've started (`GET /api/users/:id`).
+  public static func progress(of member: Member) async throws -> [Progress] {
+    struct Response: Decodable { let mediaProgress: [Progress] }
+    let response: Response = try await Audiobookshelf.shared.send("/api/users/\(member.id)")
+    return response.mediaProgress
   }
 
   private static func randomPassword() -> String {

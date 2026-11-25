@@ -23,6 +23,7 @@ struct SirenLiveHome: View {
   @State private var showingSettings = false
   @State private var showingServerList = false
   @State private var showingInvite = false
+  @State private var sentRefresh = 0
 
   private struct YearGoal {
     var finished: [SirenBook]
@@ -62,6 +63,11 @@ struct SirenLiveHome: View {
           goalCard
         }
 
+        if let username = authentication.server?.username, let libraryID = libraries.current?.id {
+          SirenSentShelf(username: username, libraryID: libraryID, refreshID: sentRefresh) { open($0.id) }
+            .id("\(libraryID)/\(username)")
+        }
+
         ForEach(model.sections, id: \.id) { section in
           shelf(section)
         }
@@ -76,10 +82,14 @@ struct SirenLiveHome: View {
       ToolbarItem(placement: .topBarTrailing) { profileMenu }
     }
     .refreshable {
+      sentRefresh += 1
       await model.refresh()
       await loadYear()
     }
-    .onAppear(perform: model.onAppear)
+    .onAppear {
+      model.onAppear()
+      sentRefresh += 1
+    }
     .task(id: libraries.current?.id) { await loadYear() }
     .task(id: heroKey) { await loadHeroDetail() }
     .onChange(of: libraries.current) { _, new in model.onReset(new != nil) }
@@ -337,9 +347,7 @@ struct SirenLiveHome: View {
     isAdmin ? Color(sirenHex: 0x3B4A5C) : Color(sirenHex: 0x8E4A8C)
   }
 
-  private var isAdmin: Bool {
-    authentication.server?.userType == .root || authentication.server?.userType == .admin
-  }
+  private var isAdmin: Bool { authentication.isSirenAdmin }
 
   private var initial: String {
     let name = authentication.server?.username ?? ""

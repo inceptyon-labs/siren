@@ -93,7 +93,7 @@ struct SirenDemoRoot: View {
         .sirenPageSizing()
       }
       .sheet(isPresented: $showSend) {
-        SirenSendSheet(book: Demo.saltRoad)
+        SirenSendSheetDemo(book: Demo.saltRoad)
           .presentationDetents([.fraction(0.75), .large])
           .presentationDragIndicator(.visible)
       }

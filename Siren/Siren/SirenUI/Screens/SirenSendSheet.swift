@@ -1,12 +1,29 @@
 import SwiftUI
 
-/// Send a book to someone in the household. It lands on their Home under "From <sender>".
+/// Someone in the household a book can go to.
+struct SirenRecipient: Identifiable, Hashable {
+  let id: String
+  let name: String
+  var color = Color(sirenHex: 0x8E4A8C)
+  /// Where they are with this book: "41% in", "Finished it", "Already sent".
+  var status: String?
+  /// Why they can't get it, such as a kids profile that can't see this book. Nil when they can.
+  var unavailable: String?
+
+  var initial: String { name.first.map { String($0).uppercased() } ?? "?" }
+}
+
+/// Send a book to someone in the household. It lands on their Home under "Sent to You".
 struct SirenSendSheet: View {
   let book: SirenBook
+  let recipients: [SirenRecipient]
+  @Binding var selection: Set<String>
+  var isLoading = false
+  var isSending = false
+  var error: String?
+  var onSend: () -> Void
 
   @Environment(\.dismiss) private var dismiss
-  @State private var recipients: Set<String> = [Demo.sarah.id]
-  @State private var note = ""
 
   var body: some View {
     NavigationStack {
@@ -17,18 +34,25 @@ struct SirenSendSheet: View {
         }
 
         Section {
-          ForEach(Demo.household) { member in
-            memberRow(member)
+          if isLoading {
+            ProgressView()
+              .frame(maxWidth: .infinity)
+              .listRowBackground(SirenTheme.raised)
+          }
+          ForEach(recipients) { recipient in
+            row(recipient)
               .listRowBackground(SirenTheme.raised)
           }
         } footer: {
           Text(footerText)
         }
 
-        Section {
-          TextField("Add a note", text: $note, axis: .vertical)
-            .lineLimit(1...4)
-            .listRowBackground(SirenTheme.raised)
+        if let error {
+          Section {
+            Label(error, systemImage: "exclamationmark.triangle")
+              .foregroundStyle(SirenTheme.ink)
+              .listRowBackground(SirenTheme.raised)
+          }
         }
       }
       .listStyle(.insetGrouped)
@@ -41,14 +65,16 @@ struct SirenSendSheet: View {
           Button("Cancel") { dismiss() }
         }
         ToolbarItem(placement: .confirmationAction) {
-          Button {
-            dismiss()
-          } label: {
-            Text("Send").foregroundStyle(SirenTheme.onTint)
+          if isSending {
+            ProgressView()
+          } else {
+            Button(action: onSend) {
+              Text("Send").foregroundStyle(SirenTheme.onTint)
+            }
+            .buttonStyle(.borderedProminent)
+            .fontWeight(.semibold)
+            .disabled(selection.isEmpty)
           }
-          .buttonStyle(.borderedProminent)
-          .fontWeight(.semibold)
-          .disabled(recipients.isEmpty)
         }
       }
     }
@@ -72,27 +98,33 @@ struct SirenSendSheet: View {
     .accessibilityElement(children: .combine)
   }
 
-  private func memberRow(_ member: DemoMember) -> some View {
-    let available = isAvailable(member)
-    let selected = recipients.contains(member.id)
+  private func row(_ recipient: SirenRecipient) -> some View {
+    let available = recipient.unavailable == nil
+    let selected = selection.contains(recipient.id)
     return Button {
       if selected {
-        recipients.remove(member.id)
+        selection.remove(recipient.id)
       } else {
-        recipients.insert(member.id)
+        selection.insert(recipient.id)
       }
     } label: {
       HStack(spacing: 12) {
-        HouseholdPlate(member: member, size: 36)
+        Text(recipient.initial)
+          .font(.system(size: 16, weight: .semibold))
+          .foregroundStyle(.white)
+          .frame(width: 36, height: 36)
+          .background(recipient.color, in: Circle())
           .opacity(available ? 1 : 0.4)
           .accessibilityHidden(true)
         VStack(alignment: .leading, spacing: 2) {
-          Text(member.name)
+          Text(recipient.name)
             .font(.body)
             .foregroundStyle(available ? SirenTheme.ink : SirenTheme.secondary)
-          status(for: member)
-            .font(.subheadline)
-            .foregroundStyle(SirenTheme.secondary)
+          if let detail = recipient.unavailable ?? recipient.status {
+            Text(detail)
+              .font(.subheadline)
+              .foregroundStyle(SirenTheme.secondary)
+          }
         }
         Spacer(minLength: 8)
         Image(systemName: "checkmark")
@@ -105,44 +137,51 @@ struct SirenSendSheet: View {
       .frame(minHeight: 44)
       .contentShape(Rectangle())
     }
+    .buttonStyle(.plain)
     .disabled(!available)
     .accessibilityElement(children: .combine)
     .accessibilityAddTraits(selected ? .isSelected : [])
   }
 
-  /// The kids profile only sees books tagged for kids; this one isn't.
-  private func isAvailable(_ member: DemoMember) -> Bool {
-    member.note == nil
-  }
-
-  private func status(for member: DemoMember) -> Text {
-    if let note = member.note {
-      return Text("\(note) · not available for this book")
-    }
-    if member.id == Demo.sarah.id {
-      let current = Demo.glassOrchard
-      let percent = "\(Int((current.progress * 100).rounded()))%"
-      return Text("Listening to \(Text(current.title).font(SirenType.bookTitle(.subheadline))) · \(percent)")
-    }
-    return Text("Not listening right now")
-  }
-
   private var footerText: String {
-    if recipients.isEmpty {
+    if !isLoading, recipients.isEmpty {
+      return "No one else is on this server yet. Invite someone from your profile menu on Home."
+    }
+    if selection.isEmpty {
       return "Choose who to send it to."
     }
-    let sender = Demo.jason.name
-    if recipients == [Demo.sarah.id] {
-      return "It appears on her Home under From \(sender). She can listen any time."
-    }
-    return "It appears on their Home under From \(sender). They can listen any time."
+    return "It appears on their Home under Sent to You, until they finish it."
+  }
+}
+
+/// The Send sheet over the demo household.
+struct SirenSendSheetDemo: View {
+  let book: SirenBook
+  @State private var selection: Set<String> = [Demo.sarah.id]
+  @Environment(\.dismiss) private var dismiss
+
+  var body: some View {
+    SirenSendSheet(
+      book: book,
+      recipients: Demo.household.map { member in
+        SirenRecipient(
+          id: member.id,
+          name: member.name,
+          color: member.color,
+          status: member.id == Demo.sarah.id ? "41% into \(Demo.glassOrchard.title)" : "Not started",
+          unavailable: member.note.map { "\($0) · can't see this book" }
+        )
+      },
+      selection: $selection,
+      onSend: { dismiss() }
+    )
   }
 }
 
 #Preview {
   Color.clear
     .sheet(isPresented: .constant(true)) {
-      SirenSendSheet(book: Demo.saltRoad)
+      SirenSendSheetDemo(book: Demo.saltRoad)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
     }

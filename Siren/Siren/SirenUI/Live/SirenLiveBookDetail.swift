@@ -1,4 +1,5 @@
 import API
+import SirenKit
 import SwiftUI
 
 /// Book detail bound to upstream's `BookDetailsViewModel`, with the rest of its series from
@@ -9,6 +10,8 @@ struct SirenLiveBookDetail: View {
 
   @State private var seriesModel: LibraryPage.Model?
   @State private var collectionSelector: CollectionMode?
+  @State private var showingSend = false
+  @ObservedObject private var authentication = Audiobookshelf.shared.authentication
 
   private let coverSide: CGFloat = 220
   private let seriesCoverSide: CGFloat = 104
@@ -21,6 +24,9 @@ struct SirenLiveBookDetail: View {
     ScrollView {
       VStack(spacing: 28) {
         hero
+        if authentication.isSirenAdmin, let tags = model.tags, !HouseholdSend.recipients(in: tags).isEmpty {
+          SirenSentProgress(itemID: model.bookID, tags: tags)
+        }
         if !seriesBooks.isEmpty {
           seriesSection
         }
@@ -65,6 +71,11 @@ struct SirenLiveBookDetail: View {
       NavigationStack {
         EbookReaderView(model: reader)
       }
+    }
+    .sheet(isPresented: $showingSend) {
+      SirenLiveSendSheet(book: book, onSent: model.onAppear)
+        .presentationDetents([.fraction(0.75), .large])
+        .presentationDragIndicator(.visible)
     }
     .sheet(item: $collectionSelector) { mode in
       CollectionSelectorSheet(model: CollectionSelectorSheetModel(bookID: model.bookID, mode: mode))
@@ -461,6 +472,9 @@ struct SirenLiveBookDetail: View {
         Button("Add to Collection", systemImage: "square.stack.3d.up") { collectionSelector = .collections }
       }
       Button("Add to Playlist", systemImage: "music.note.list") { collectionSelector = .playlists }
+      if authentication.isSirenAdmin {
+        Button("Send…", systemImage: "paperplane") { showingSend = true }
+      }
       Section {
         if model.actions.contains(.markAsFinished) {
           Button("Mark as Finished", systemImage: "checkmark.circle", action: model.onMarkFinishedTapped)
