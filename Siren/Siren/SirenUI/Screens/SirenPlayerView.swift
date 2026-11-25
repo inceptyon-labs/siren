@@ -96,9 +96,14 @@ struct SirenPlayerView<MoreMenu: View>: View {
           Menu(content: moreMenu) {
             Image(systemName: "ellipsis")
               .font(.title3.weight(.semibold))
+              .foregroundStyle(SirenTheme.ink)
               .frame(width: 44, height: 44)
               .contentShape(Rectangle())
           }
+          // Borderless with no arrow, also on the Mac, where a menu is otherwise a pull-down button.
+          .menuStyle(.button)
+          .buttonStyle(.borderless)
+          .menuIndicator(.hidden)
           .foregroundStyle(SirenTheme.ink)
           .accessibilityLabel("More")
         }
@@ -187,6 +192,7 @@ struct SirenPlayerView<MoreMenu: View>: View {
           if !editing { playback.onScrub(playback.position, false) }
         }
       )
+      .tint(SirenTheme.tint)
       HStack {
         Text(playback.elapsed)
         Spacer()
@@ -282,6 +288,8 @@ struct SirenPlayerView<MoreMenu: View>: View {
         .disabled(book.chapterCount < 2)
     }
     .foregroundStyle(SirenTheme.tint)
+    // No bezels on the Mac.
+    .buttonStyle(.borderless)
     .frame(minHeight: 44)
   }
 

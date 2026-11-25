@@ -51,6 +51,10 @@ struct SirenRootSwitch: View {
   @ObservedObject private var libraries = Audiobookshelf.shared.libraries
 
   var body: some View {
+    root.task { SirenMac.configure() }
+  }
+
+  @ViewBuilder private var root: some View {
     if let screen = SirenDemoScreen.requested {
       SirenDemoRoot(screen: screen)
     } else {

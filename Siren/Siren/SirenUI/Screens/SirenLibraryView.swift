@@ -81,6 +81,8 @@ struct SirenLibraryView: View {
           ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill"
       )
     }
+    // No pull-down arrow on the Mac.
+    .menuIndicator(.hidden)
   }
 
   /// Demo.library repeats two titles from the finished shelf; show each book once.

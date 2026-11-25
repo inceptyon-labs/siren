@@ -121,7 +121,9 @@ struct SirenLivePlayer: View {
     if model.podcastID == nil, authentication.isSirenAdmin {
       Button("Send…", systemImage: "paperplane") { showingSend = true }
     }
-    Button("Car Mode", systemImage: "car") { SirenCarMode.shared.open() }
+    if !ProcessInfo.processInfo.isMacCatalystApp {
+      Button("Car Mode", systemImage: "car") { SirenCarMode.shared.open() }
+    }
     Button("Queue", systemImage: "list.number") { model.isQueuePresented = true }
     if model.history != nil {
       Button("History", systemImage: "clock.arrow.circlepath", action: model.onHistoryTapped)
