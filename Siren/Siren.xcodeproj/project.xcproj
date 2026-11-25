@@ -35,7 +35,7 @@
       "kind": "remote",
       "repository": "https://github.com/apple/swift-log",
       "version": {
-        "version": "1.17.0",
+        "version": "1.17.2",
       },
     }, {
       "kind": "remote",
