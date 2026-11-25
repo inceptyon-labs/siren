@@ -588,11 +588,11 @@ struct RevealCover: View {
   var resolution: CoverResolution = .small
 
   @State private var loaded: (url: URL, images: CoverImages)?
-  @AppStorage(SirenSettings.artStyle) private var style: SirenArtStyleChoice = .coverReveal
+  @AppStorage(SirenSettings.coverReveal) private var revealsProgress = true
 
   var body: some View {
-    // With progress art off, covers are just covers.
-    let p = style == .off ? 1 : progress ?? book.progress
+    // With the reveal off, covers are just covers.
+    let p = revealsProgress ? progress ?? book.progress : 1
     Color.clear
       .aspectRatio(1, contentMode: .fit)
       .overlay {

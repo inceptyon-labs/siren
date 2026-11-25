@@ -2,9 +2,8 @@ import Foundation
 import SwiftUI
 
 struct SirenProgressArtSettingsView: View {
-  @AppStorage(SirenSettings.artStyle) private var style: SirenArtStyleChoice = .coverReveal
-  @AppStorage(SirenSettings.artInPlayer) private var showInPlayer = true
-  @AppStorage(SirenSettings.artOnFinishedShelf) private var showOnFinishedShelf = true
+  @AppStorage(SirenSettings.coverReveal) private var revealsProgress = true
+  @AppStorage(SirenSettings.playerArt) private var playerArt: PlayerArt = .cover
   @AppStorage(SirenSettings.goalUnit) private var goalUnit: SirenGoalUnit = .books
   @AppStorage(SirenSettings.bookGoal) private var bookGoal = 20
   @AppStorage(SirenSettings.hourGoal) private var hourGoal = 150
@@ -13,25 +12,38 @@ struct SirenProgressArtSettingsView: View {
   var body: some View {
     List {
       Section {
-        ForEach(styleChoices) { choice in
-          styleRow(choice)
+        choiceRow("Plain", detail: "Just the cover", isSelected: !revealsProgress) {
+          RevealCover(book: Demo.saltRoad, progress: 1)
+        } action: {
+          revealsProgress = false
+        }
+        choiceRow("Ink in as you listen", detail: "The sketch fills with colour", isSelected: revealsProgress) {
+          RevealCover(book: Demo.saltRoad, progress: 0.57)
+        } action: {
+          revealsProgress = true
         }
       } header: {
-        Text("Style")
+        Text("Covers")
       } footer: {
-        Text("Art fills in as you listen. Only you see it.")
+        Text("Every cover in the app. Only you see your progress.")
       }
 
-      Section("Show art") {
-        Toggle("In the player", isOn: $showInPlayer)
-          .foregroundStyle(SirenTheme.ink)
-          .listRowBackground(SirenTheme.raised)
-        // The finished-books shelf arrives with the household and series work; demo only until then.
-        if SirenDemoScreen.requested != nil {
-          Toggle("Finished books shelf", isOn: $showOnFinishedShelf)
-            .foregroundStyle(SirenTheme.ink)
-            .listRowBackground(SirenTheme.raised)
+      Section {
+        ForEach(playerChoices) { choice in
+          choiceRow(choice.label, detail: choice.detail, isSelected: playerArt == choice) {
+            preview(for: choice)
+          } action: {
+            playerArt = choice
+          }
         }
+      } header: {
+        Text("Player")
+      } footer: {
+        Text(
+          playerArt == .map
+            ? "The full player opens on the map; swipe the art for the cover."
+            : "What the full player shows above the controls."
+        )
       }
 
       Section("Yearly goal") {
@@ -68,24 +80,29 @@ struct SirenProgressArtSettingsView: View {
     .navigationBarTitleDisplayMode(.inline)
   }
 
-  private func styleRow(_ choice: SirenArtStyleChoice) -> some View {
-    Button {
-      style = choice
-    } label: {
+  private func choiceRow<Preview: View>(
+    _ title: LocalizedStringKey,
+    detail: LocalizedStringKey,
+    isSelected: Bool,
+    @ViewBuilder preview: () -> Preview,
+    action: @escaping () -> Void
+  ) -> some View {
+    Button(action: action) {
       HStack(spacing: 14) {
-        preview(for: choice)
+        preview()
+          .frame(width: 56, height: 56)
           .accessibilityHidden(true)
         VStack(alignment: .leading, spacing: 2) {
-          Text(choice.title)
+          Text(title)
             .font(.body)
             .foregroundStyle(SirenTheme.ink)
-          Text(choice.detail)
+          Text(detail)
             .font(.footnote)
             .foregroundStyle(SirenTheme.secondary)
         }
         .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
         Spacer(minLength: 8)
-        if style == choice {
+        if isSelected {
           Image(systemName: "checkmark")
             .font(.body.weight(.semibold))
             .foregroundStyle(SirenTheme.tint)
@@ -96,18 +113,14 @@ struct SirenProgressArtSettingsView: View {
     }
     .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 16))
     .listRowBackground(SirenTheme.raised)
-    .accessibilityAddTraits(style == choice ? .isSelected : [])
+    .accessibilityAddTraits(isSelected ? .isSelected : [])
   }
 
   @ViewBuilder
-  private func preview(for choice: SirenArtStyleChoice) -> some View {
+  private func preview(for choice: PlayerArt) -> some View {
     switch choice {
-    case .off:
-      RevealCover(book: Demo.saltRoad, progress: 1)
-        .frame(width: 56, height: 56)
-    case .coverReveal:
-      RevealCover(book: Demo.saltRoad, progress: 0.57)
-        .frame(width: 56, height: 56)
+    case .cover:
+      RevealCover(book: Demo.saltRoad, progress: revealsProgress ? 0.57 : 1)
     case .map:
       // Crop toward the inked island so the fog edge stays in frame.
       thumbnail(
@@ -117,7 +130,7 @@ struct SirenProgressArtSettingsView: View {
           .frame(width: 84, height: 84)
           .frame(width: 56, height: 56, alignment: .leading)
       )
-    case .voicePrint:
+    case .voice:
       thumbnail(SirenVoicePrintThumbnail())
     }
   }
@@ -134,9 +147,8 @@ struct SirenProgressArtSettingsView: View {
   }
 
   /// Voice print needs the loudness scan from trim silence (Phase 4); the demo still shows it.
-  private var styleChoices: [SirenArtStyleChoice] {
-    SirenDemoScreen.requested == nil
-      ? SirenArtStyleChoice.allCases.filter { $0 != .voicePrint } : SirenArtStyleChoice.allCases
+  private var playerChoices: [PlayerArt] {
+    SirenDemoScreen.requested == nil ? [.cover, .map] : PlayerArt.allCases
   }
 
   private var goalValue: Binding<Int> {
@@ -197,30 +209,6 @@ private struct SirenVoicePrintThumbnail: View {
       }
     }
   }()
-}
-
-enum SirenArtStyleChoice: String, CaseIterable, Identifiable {
-  case off, coverReveal, map, voicePrint
-
-  var id: Self { self }
-
-  var title: LocalizedStringKey {
-    switch self {
-    case .off: "Off"
-    case .coverReveal: "Cover reveal"
-    case .map: "Map"
-    case .voicePrint: "Voice print"
-    }
-  }
-
-  var detail: LocalizedStringKey {
-    switch self {
-    case .off: "Just the cover"
-    case .coverReveal: "The sketch fills with colour"
-    case .map: "Fog lifts along your route"
-    case .voicePrint: "A ridge for every chapter"
-    }
-  }
 }
 
 enum SirenGoalUnit: String, Hashable {

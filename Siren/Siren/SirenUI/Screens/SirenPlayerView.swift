@@ -173,7 +173,7 @@ struct SirenPlayerView<MoreMenu: View>: View {
         }
       }
       .accessibilityElement(children: .ignore)
-      .accessibilityLabel("Art view: \(art.label)")
+      .accessibilityLabel(Text("Art view: ") + Text(art.label))
     }
   }
 

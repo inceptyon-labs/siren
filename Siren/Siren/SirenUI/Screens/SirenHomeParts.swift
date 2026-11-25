@@ -111,9 +111,15 @@ struct SirenGoalCard: View {
             if index < finished.count {
               RevealCover(book: finished[index], progress: 1, cornerRadius: 3, shadow: false)
             } else if index < count {
+              // Finished, but the server has no cover for it.
               RoundedRectangle(cornerRadius: 3, style: .continuous)
-                .fill(SirenTheme.tint.opacity(0.35))
+                .fill(SirenTheme.paper)
                 .aspectRatio(1, contentMode: .fit)
+                .overlay {
+                  Image(systemName: "checkmark")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(SirenTheme.graphite)
+                }
             } else {
               RoundedRectangle(cornerRadius: 3, style: .continuous)
                 .strokeBorder(SirenTheme.secondary.opacity(0.45), style: StrokeStyle(lineWidth: 1, dash: [3, 2]))

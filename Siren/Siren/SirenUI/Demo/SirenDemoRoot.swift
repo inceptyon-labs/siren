@@ -19,11 +19,19 @@ enum SirenDemoScreen: String, CaseIterable {
 enum PlayerArt: Int, CaseIterable, Identifiable {
   case cover, map, voice
   var id: Int { rawValue }
-  var label: String {
+  var label: LocalizedStringKey {
     switch self {
     case .cover: "Cover"
     case .map: "Map"
     case .voice: "Voice print"
+    }
+  }
+
+  var detail: LocalizedStringKey {
+    switch self {
+    case .cover: "The cover, large"
+    case .map: "Fog lifts along your route"
+    case .voice: "A ridge for every chapter"
     }
   }
 }

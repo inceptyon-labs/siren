@@ -7,8 +7,7 @@ struct SirenLivePlayer: View {
   var onGoToBook: (String) -> Void
 
   @ObservedObject private var preferences = UserPreferences.shared
-  @AppStorage(SirenSettings.artStyle) private var style: SirenArtStyleChoice = .coverReveal
-  @AppStorage(SirenSettings.artInPlayer) private var showArtInPlayer = true
+  @AppStorage(SirenSettings.playerArt) private var playerArt: PlayerArt = .cover
   @State private var art: PlayerArt = .cover
 
   var body: some View {
@@ -27,9 +26,9 @@ struct SirenLivePlayer: View {
     .modifier(SirenPlayerSheets(model: model))
   }
 
-  /// The map joins the cover when it's the chosen progress art, and opens first.
+  /// With Map chosen the player opens on the map, and the cover is a swipe away.
   private var pages: [PlayerArt] {
-    showArtInPlayer && style == .map ? [.cover, .map] : [.cover]
+    playerArt == .map ? [.cover, .map] : [.cover]
   }
 
   /// Bookmarks as fractions of the book, for the map's flags.
