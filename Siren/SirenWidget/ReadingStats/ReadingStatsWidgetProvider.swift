@@ -30,7 +30,7 @@ struct ReadingStatsWidgetProvider: TimelineProvider {
   }
 
   private func loadStats() -> WidgetStatsData? {
-    guard let sharedDefaults = UserDefaults(suiteName: "group.com.inceptyon.siren"), // SIREN: Siren identifiers
+    guard let sharedDefaults = UserDefaults(suiteName: "group.com.inceptyon.siren"),  // SIREN: Siren identifiers
       let data = sharedDefaults.data(forKey: "listeningStats"),
       let stats = try? JSONDecoder().decode(WidgetStatsData.self, from: data)
     else {

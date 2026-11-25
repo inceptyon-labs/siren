@@ -34,7 +34,7 @@ final class PlayerManager: ObservableObject, Sendable {
 
   private static let currentIDKey = "currentBookID"
   private static let queueKey = "playerQueue"
-  private let sharedDefaults = UserDefaults(suiteName: "group.com.inceptyon.siren") // SIREN: Siren identifiers
+  private let sharedDefaults = UserDefaults(suiteName: "group.com.inceptyon.siren")  // SIREN: Siren identifiers
 
   private var cancellables = Set<AnyCancellable>()
   private var serverID: String?
@@ -597,6 +597,8 @@ extension PlayerManager {
           currentPodcastID: currentPodcastID
         )
       else {
+        // SIREN: offer the next book in the series
+        if !isManual, currentPodcastID == nil { SirenEndOfBook.shared.bookFinished(currentID) }
         clearCurrent()
         return
       }

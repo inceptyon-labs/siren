@@ -1,9 +1,10 @@
+import API
 import Foundation
 import SwiftUI
 
 /// Launch with `-SirenDemo <screen>` to open a demo screen instead of the app.
 enum SirenDemoScreen: String, CaseIterable {
-  case home, library, book, send, request, car, household
+  case home, library, book, send, request, car, household, invite
   case homeSarah = "home-sarah"
   case playerCover = "player-cover"
   case playerMap = "player-map"
@@ -18,11 +19,19 @@ enum SirenDemoScreen: String, CaseIterable {
 enum PlayerArt: Int, CaseIterable, Identifiable {
   case cover, map, voice
   var id: Int { rawValue }
-  var label: String {
+  var label: LocalizedStringKey {
     switch self {
     case .cover: "Cover"
     case .map: "Map"
     case .voice: "Voice print"
+    }
+  }
+
+  var detail: LocalizedStringKey {
+    switch self {
+    case .cover: "The cover, large"
+    case .map: "Fog lifts along your route"
+    case .voice: "A ridge for every chapter"
     }
   }
 }
@@ -32,14 +41,28 @@ enum SirenTab: Hashable { case home, library, household, search }
 enum SirenRoute: Hashable {
   case book(String)
   case progressArt
+  case profiles
+  case requests
+  case smartPlaylist(UUID)
 }
 
+/// Demo screens with `-SirenDemo`, upstream's screens for podcast libraries, Siren's otherwise.
 struct SirenRootSwitch: View {
+  @ObservedObject private var libraries = Audiobookshelf.shared.libraries
+
   var body: some View {
     if let screen = SirenDemoScreen.requested {
       SirenDemoRoot(screen: screen)
     } else {
-      ContentView()
+      Group {
+        if libraries.current?.mediaType == .podcast {
+          ContentView()
+        } else {
+          SirenLiveRoot()
+        }
+      }
+      // Above both roots, so a podcast library can't skip a profile's Face ID check.
+      .overlay { SirenProfileGate() }
     }
   }
 }
@@ -52,6 +75,7 @@ struct SirenDemoRoot: View {
   @State private var showPlayer = false
   @State private var playerArt: PlayerArt = .cover
   @State private var showCar = false
+  @State private var showInvite = false
   @State private var showSend = false
   @State private var searchText = ""
   @State private var viewer = Demo.jason
@@ -61,17 +85,44 @@ struct SirenDemoRoot: View {
       .tint(SirenTheme.tint)
       .onAppear(perform: route)
       .sheet(isPresented: $showPlayer) {
-        SirenPlayerView(art: $playerArt, onCarMode: { showPlayer = false; showCar = true })
-          .presentationDragIndicator(.visible)
-          .sirenPageSizing()
+        SirenPlayerView(
+          book: Demo.saltRoad,
+          playback: Demo.playback,
+          flags: [3, 9, 13].map { Demo.saltRoad.chapterStarts[$0 - 1] },
+          art: $playerArt
+        ) {
+          Button("Car Mode", systemImage: "car") {
+            showPlayer = false
+            showCar = true
+          }
+          Button("Send…", systemImage: "paperplane") {}
+          Button("Go to Book", systemImage: "book") {}
+        }
+        .presentationDragIndicator(.visible)
+        .sirenPageSizing()
       }
       .sheet(isPresented: $showSend) {
-        SirenSendSheet(book: Demo.saltRoad)
-          .presentationDetents([.medium, .large])
+        SirenSendSheetDemo(book: Demo.saltRoad)
+          .presentationDetents([.fraction(0.75), .large])
           .presentationDragIndicator(.visible)
       }
+      .sheet(isPresented: $showInvite) {
+        NavigationStack {
+          // A made-up key: the code is only drawn, never scanned.
+          SirenInviteCode(
+            name: "sarah",
+            url: URL(
+              string: "siren://connection/"
+                + String(repeating: "eyJ1cmwiOiJodHRwOi8vMTkyLjE2OC4yLjIyMjoxMzM3OCJ9", count: 8)
+            )!,
+            host: "192.168.2.222:13378"
+          )
+          .navigationTitle("Invite for sarah")
+          .navigationBarTitleDisplayMode(.inline)
+        }
+      }
       .fullScreenCover(isPresented: $showCar) {
-        SirenCarModeView(onClose: { showCar = false })
+        SirenCarModeDemo(onClose: { showCar = false })
       }
   }
 
@@ -89,6 +140,7 @@ struct SirenDemoRoot: View {
       tab = .search
       searchText = "Kessling"
     case .car: showCar = true
+    case .invite: showInvite = true
     case .playerCover: open(.cover)
     case .playerMap: open(.map)
     case .playerVoice: open(.voice)
@@ -150,46 +202,9 @@ struct SirenDemoRoot: View {
       )
     case .progressArt:
       SirenProgressArtSettingsView()
+    case .profiles, .requests, .smartPlaylist:
+      EmptyView()
     }
-  }
-}
-
-struct SirenMiniPlayer: View {
-  let book: DemoBook
-  var onOpen: () -> Void
-
-  var body: some View {
-    HStack(spacing: 12) {
-      RevealCover(book: book, cornerRadius: 4, shadow: false)
-        .frame(width: 34, height: 34)
-      VStack(alignment: .leading, spacing: 1) {
-        Text(book.title)
-          .font(SirenType.bookTitle(.subheadline))
-          .foregroundStyle(SirenTheme.ink)
-        Text("Ch \(book.currentChapter) · \(book.chapterRemaining) left")
-          .font(.caption)
-          .foregroundStyle(SirenTheme.secondary)
-          .monospacedDigit()
-      }
-      Spacer(minLength: 8)
-      Button {} label: {
-        Image(systemName: "pause.fill").font(.title3)
-      }
-      .buttonStyle(.plain)
-      .frame(width: 44, height: 44)
-      .accessibilityLabel("Pause")
-      Button {} label: {
-        Image(systemName: "goforward.30").font(.title3)
-      }
-      .buttonStyle(.plain)
-      .frame(width: 44, height: 44)
-      .accessibilityLabel("Forward 30 seconds")
-    }
-    .foregroundStyle(SirenTheme.ink)
-    .padding(.leading, 10)
-    .padding(.trailing, 4)
-    .contentShape(Rectangle())
-    .onTapGesture(perform: onOpen)
   }
 }
 

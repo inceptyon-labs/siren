@@ -31,7 +31,8 @@ struct AudiobookshelfInfoView: View {
       .font(.body)
 
       Text(
-        "It stores your audiobooks and podcasts, tracks your progress, and serves them to apps like Siren. There is no Siren account and no Siren cloud, so your library stays on hardware you control." // SIREN: Siren name
+        // SIREN: Siren name
+        "It stores your audiobooks and podcasts, tracks your progress, and serves them to apps like Siren. There is no Siren account and no Siren cloud, so your library stays on hardware you control."
       )
       .font(.body)
       .foregroundStyle(.secondary)

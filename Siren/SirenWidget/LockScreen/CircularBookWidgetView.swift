@@ -48,7 +48,7 @@ struct CircularBookWidgetView: View {
   }
 
   private var icon: some View {
-    Label(String("Siren"), image: "siren.fill") // SIREN: Siren name
+    Label(String("Siren"), image: "siren.fill")  // SIREN: Siren name
       .labelStyle(.iconOnly)
   }
 }

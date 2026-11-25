@@ -2,12 +2,14 @@ import SwiftUI
 import UIKit
 
 enum AppTheme: String, CaseIterable {
+  case siren  // SIREN: Siren's ground and row colours
   case sepia
   case system
   case pure
 
   var displayText: LocalizedStringResource {
     switch self {
+    case .siren: "Siren"  // SIREN: Siren theme
     case .sepia: "Sepia"
     case .system: "System"
     case .pure: "Pure"
@@ -16,6 +18,8 @@ enum AppTheme: String, CaseIterable {
 
   var colors: Colors {
     switch self {
+    case .siren:  // SIREN: Siren theme
+      Colors(background: Colors.Background(page: SirenTheme.ground, card: SirenTheme.raised))
     case .sepia:
       Colors(
         background: Colors.Background(

@@ -8,7 +8,8 @@ struct ConnectionSharingPage: View {
 
   var body: some View {
     VStack(spacing: 20) {
-      Text("Share this QR code or link with another Siren user to help them connect to your server") // SIREN: Siren name
+      // SIREN: Siren name
+      Text("Share this QR code or link with another Siren user to help them connect to your server")
         .font(.subheadline)
         .foregroundStyle(.secondary)
         .multilineTextAlignment(.center)
@@ -109,7 +110,7 @@ extension ConnectionSharingPage {
 #Preview {
   let context = CIContext()
   let filter = CIFilter.qrCodeGenerator()
-  filter.message = Data("siren://connection?data=test".utf8) // SIREN: Siren identifiers
+  filter.message = Data("siren://connection?data=test".utf8)  // SIREN: Siren identifiers
   filter.correctionLevel = "L"
 
   let outputImage = filter.outputImage!
@@ -122,7 +123,7 @@ extension ConnectionSharingPage {
     ConnectionSharingPage(
       model: .init(
         qrCodeImage: qrCode,
-        connectionURL: URL(string: "siren://connection?data=test") // SIREN: Siren identifiers
+        connectionURL: URL(string: "siren://connection?data=test")  // SIREN: Siren identifiers
       )
     )
   }

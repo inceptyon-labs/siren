@@ -31,14 +31,14 @@ final class OIDCAuthenticationManager {
     if #available(iOS 17.4, *) {
       callbackURL = try await session.authenticate(
         using: redirectURL,
-        callback: .customScheme("siren"), // SIREN: Siren identifiers
+        callback: .customScheme("siren"),  // SIREN: Siren identifiers
         preferredBrowserSession: .shared,
         additionalHeaderFields: customHeaders
       )
     } else {
       callbackURL = try await session.authenticate(
         using: redirectURL,
-        callbackURLScheme: "siren", // SIREN: Siren identifiers
+        callbackURLScheme: "siren",  // SIREN: Siren identifiers
         preferredBrowserSession: .shared
       )
     }
@@ -114,11 +114,11 @@ final class OIDCAuthenticationManager {
       resolvingAgainstBaseURL: false
     )
     components?.queryItems = [
-      URLQueryItem(name: "client_id", value: "Siren"), // SIREN: Siren name
+      URLQueryItem(name: "client_id", value: "Siren"),  // SIREN: Siren name
       URLQueryItem(name: "response_type", value: "code"),
       URLQueryItem(name: "scope", value: "openid"),
-      URLQueryItem(name: "redirect_uri", value: "siren://oauth"), // SIREN: Siren identifiers
-      URLQueryItem(name: "callback", value: "siren://oauth"), // SIREN: Siren identifiers
+      URLQueryItem(name: "redirect_uri", value: "siren://oauth"),  // SIREN: Siren identifiers
+      URLQueryItem(name: "callback", value: "siren://oauth"),  // SIREN: Siren identifiers
       URLQueryItem(name: "code_challenge", value: pkce.challenge),
       URLQueryItem(name: "code_challenge_method", value: "S256"),
     ]
@@ -235,7 +235,7 @@ enum OIDCError: LocalizedError {
   var errorDescription: String? {
     switch self {
     case .invalidCallback:
-      return "Add **siren://oauth** to your **Allowed Mobile Redirect URIs**" // SIREN: Siren identifiers
+      return "Add **siren://oauth** to your **Allowed Mobile Redirect URIs**"  // SIREN: Siren identifiers
     case .authenticationFailed(let error):
       return "Authentication failed: \(error)"
     case .noAuthorizationCode(let available):

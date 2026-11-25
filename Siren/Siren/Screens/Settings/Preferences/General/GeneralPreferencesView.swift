@@ -25,11 +25,7 @@ struct GeneralPreferencesView: View {
           .listRowBackground(theme.colors.background.card)
         #endif
 
-        ThemePickerView()
-          .listRowBackground(theme.colors.background.card)
-
-        AccentColorPickerView()
-          .listRowBackground(theme.colors.background.card)
+        // SIREN: Siren has one look, so the theme and accent pickers are gone
 
         ColorSchemePickerView()
           .listRowBackground(theme.colors.background.card)

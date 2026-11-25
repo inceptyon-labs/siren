@@ -21,7 +21,8 @@ struct SirenWatch: App {
 }
 
 extension ImagePipeline {
-  nonisolated private static let dataCache = try? DataCache(name: "com.inceptyon.siren.watch.images") // SIREN: Siren identifiers
+  // SIREN: Siren identifiers
+  nonisolated private static let dataCache = try? DataCache(name: "com.inceptyon.siren.watch.images")
 
   nonisolated static func watch(customHeaders: [String: String]?) -> ImagePipeline {
     ImagePipeline {

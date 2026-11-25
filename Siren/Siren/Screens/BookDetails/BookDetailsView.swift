@@ -735,6 +735,7 @@ extension BookDetailsView {
     var error: String?
     var genres: [String]?
     var tags: [String]?
+    var asin: String?  // SIREN: Audible ratings
     var description: String?
     var actions: Actions
     var bookmarks: BookmarkViewerSheet.Model?

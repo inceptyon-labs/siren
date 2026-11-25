@@ -47,7 +47,7 @@ struct SirenLockscreenBookWidget: Widget {
     StaticConfiguration(kind: kind, provider: SirenWidgetProvider()) { entry in
       LockscreenBookWidgetView(entry: entry)
     }
-    .configurationDisplayName("Siren") // SIREN: Siren name
+    .configurationDisplayName("Siren")  // SIREN: Siren name
     .description("Open now playing or recent book")
     .supportedFamilies([.accessoryCircular, .accessoryRectangular])
   }

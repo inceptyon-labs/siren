@@ -1032,7 +1032,7 @@ extension WatchConnectivityManager: WCSessionDelegate {
           updatedAt: Int(updatedAt * 1000),
           deviceInfo: SessionSync.DeviceInfo(
             deviceID: Self.watchDeviceID,
-            clientName: "Siren Watch", // SIREN: Siren name
+            clientName: "Siren Watch",  // SIREN: Siren name
             model: nil
           )
         )

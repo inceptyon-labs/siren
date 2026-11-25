@@ -13,7 +13,7 @@ class DeepLinkManager: ObservableObject {
 
   func handleDeepLink(_ url: URL) {
     guard
-      url.scheme == "siren", // SIREN: Siren identifiers
+      url.scheme == "siren",  // SIREN: Siren identifiers
       let components = URLComponents(url: url, resolvingAgainstBaseURL: true)
     else { return }
 
@@ -103,11 +103,11 @@ class DeepLinkManager: ObservableObject {
       return nil
     }
 
-    return URL(string: "siren://connection/\(base64)") // SIREN: Siren identifiers
+    return URL(string: "siren://connection/\(base64)")  // SIREN: Siren identifiers
   }
 
   static func decodeConnectionDeepLink(_ url: URL) -> ExportConnection? {
-    guard url.scheme == "siren", // SIREN: Siren identifiers
+    guard url.scheme == "siren",  // SIREN: Siren identifiers
       let components = URLComponents(url: url, resolvingAgainstBaseURL: true),
       components.host == "connection",
       let data = Data(base64Encoded: String(components.path.dropFirst()))

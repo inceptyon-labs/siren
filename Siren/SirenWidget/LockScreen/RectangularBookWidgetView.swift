@@ -13,7 +13,8 @@ struct RectangularBookWidgetView: View {
   }
   let action: Action
 
-  @AppStorage("timeRemainingAdjustsWithSpeed", store: UserDefaults(suiteName: "group.com.inceptyon.siren")) // SIREN: Siren identifiers
+  // SIREN: Siren identifiers
+  @AppStorage("timeRemainingAdjustsWithSpeed", store: UserDefaults(suiteName: "group.com.inceptyon.siren"))
   var timeRemainingAdjustsWithSpeed: Bool = true
 
   var body: some View {

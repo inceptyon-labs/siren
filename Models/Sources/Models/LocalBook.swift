@@ -49,7 +49,7 @@ public final class LocalBook {
 
     guard
       let appGroupURL = FileManager.default.containerURL(
-        forSecurityApplicationGroupIdentifier: "group.com.inceptyon.siren" // SIREN: Siren identifiers
+        forSecurityApplicationGroupIdentifier: "group.com.inceptyon.siren"  // SIREN: Siren identifiers
       )
     else {
       return nil
@@ -65,7 +65,7 @@ public final class LocalBook {
 
     guard
       let appGroupURL = FileManager.default.containerURL(
-        forSecurityApplicationGroupIdentifier: "group.com.inceptyon.siren" // SIREN: Siren identifiers
+        forSecurityApplicationGroupIdentifier: "group.com.inceptyon.siren"  // SIREN: Siren identifiers
       )
     else {
       return nil

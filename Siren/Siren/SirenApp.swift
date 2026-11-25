@@ -19,9 +19,9 @@ struct SirenApp: App {
         .displayScaled()
         .tint(preferences.accentColor)
         .preferredColorScheme(preferences.colorScheme.colorScheme)
-        .environment(\.appTheme, preferences.appTheme)
+        .environment(\.appTheme, .siren)  // SIREN: one look
         .onChange(of: preferences.accentColor, initial: true) {
-          updateWindowTintColor(preferences.accentColor)
+          updateWindowTintColor(SirenTheme.tint)  // SIREN: one look
           syncAccentColorToWidget(preferences.accentColor)
         }
         .onChange(of: preferences.colorScheme, initial: true) {
@@ -75,7 +75,7 @@ struct SirenApp: App {
   }
 
   private func syncAccentColorToWidget(_ color: Color?) {
-    let sharedDefaults = UserDefaults(suiteName: "group.com.inceptyon.siren") // SIREN: Siren identifiers
+    let sharedDefaults = UserDefaults(suiteName: "group.com.inceptyon.siren")  // SIREN: Siren identifiers
     sharedDefaults?.set(color?.rawValue, forKey: "accentColor")
     WidgetCenter.shared.reloadAllTimelines()
   }

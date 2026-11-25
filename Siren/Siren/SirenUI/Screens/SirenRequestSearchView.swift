@@ -13,7 +13,7 @@ struct SirenRequestSearchView: View {
     case library, request
   }
 
-  private var results: [DemoBook] {
+  private var results: [SirenBook] {
     switch scope {
     case .library: Demo.catalogResults.filter { $0.inLibrary }
     case .request: Demo.catalogResults
@@ -61,19 +61,25 @@ struct SirenRequestSearchView: View {
           description: Text(
             scope == .request
               ? "Search the Audible catalog. Books you don't have can be requested."
-              : "Search your library by title, author or narrator.")
+              : "Search your library by title, author or narrator."
+          )
         )
       }
     }
     .navigationTitle("Search")
     .navigationBarTitleDisplayMode(.large)
-    .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Title, author or narrator")
+    .searchable(
+      text: $query,
+      placement: .navigationBarDrawer(displayMode: .always),
+      prompt: "Title, author or narrator"
+    )
   }
 
   // MARK: Rows
 
-  private func resultRow(_ book: DemoBook) -> some View {
-    let layout = dynamicTypeSize.isAccessibilitySize
+  private func resultRow(_ book: SirenBook) -> some View {
+    let layout =
+      dynamicTypeSize.isAccessibilitySize
       ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
       : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
     return layout {
@@ -104,7 +110,7 @@ struct SirenRequestSearchView: View {
     .padding(.vertical, 6)
   }
 
-  @ViewBuilder private func meta(for book: DemoBook) -> some View {
+  @ViewBuilder private func meta(for book: SirenBook) -> some View {
     if book.rating > 0 {
       StarRating(rating: book.rating, count: book.ratingCount)
     }
@@ -116,7 +122,7 @@ struct SirenRequestSearchView: View {
     }
   }
 
-  private func byline(for book: DemoBook) -> String {
+  private func byline(for book: SirenBook) -> String {
     guard let series = book.series else { return book.author }
     guard let index = book.seriesIndex else { return "\(book.author) · \(series)" }
     return "\(book.author) · \(series), Book \(index)"
@@ -138,7 +144,7 @@ struct SirenRequestSearchView: View {
     case requestable(releaseDate: String?)
   }
 
-  private func rowState(for book: DemoBook) -> RowState {
+  private func rowState(for book: SirenBook) -> RowState {
     if book.inLibrary { return .play }
     if requested.contains(book.id) { return .requested }
     if let request = book.request {
@@ -148,7 +154,7 @@ struct SirenRequestSearchView: View {
     return .requestable(releaseDate: book.releaseDate)
   }
 
-  @ViewBuilder private func stateControl(for book: DemoBook) -> some View {
+  @ViewBuilder private func stateControl(for book: SirenBook) -> some View {
     switch rowState(for: book) {
     case .play:
       Button("Play") {}
@@ -192,7 +198,7 @@ struct SirenRequestSearchView: View {
 
 /// Filled for a book you can request now; tinted for Play and for books not yet released.
 /// Draws 30pt tall and keeps a 44pt hit area.
-private struct RequestSearchCapsuleStyle: ButtonStyle {
+struct RequestSearchCapsuleStyle: ButtonStyle {
   var filled: Bool
 
   func makeBody(configuration: Configuration) -> some View {

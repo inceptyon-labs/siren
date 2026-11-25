@@ -140,6 +140,7 @@ final class BookDetailsViewModel: BookDetailsView.Model {
     do {
       let book = try await booksService.fetch(id: bookID)
       self.book = book
+      asin = book.media.metadata.asin  // SIREN: Audible ratings
 
       let authors =
         book.media.metadata.authors?.map { apiAuthor in

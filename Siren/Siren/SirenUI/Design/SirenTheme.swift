@@ -83,10 +83,13 @@ struct StarRating: View {
         Text("(\(count.formatted()))")
           .font(.footnote)
           .foregroundStyle(SirenTheme.secondary)
+          .fixedSize()
       }
     }
     .accessibilityElement(children: .ignore)
-    .accessibilityLabel("Rated \(rating, specifier: "%.1f") from \(count) ratings")
+    .accessibilityLabel(
+      count > 0 ? "Rated \(rating, specifier: "%.1f") from \(count) ratings" : "Rated \(rating, specifier: "%.1f")"
+    )
   }
 }
 

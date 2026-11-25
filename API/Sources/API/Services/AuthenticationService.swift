@@ -6,7 +6,7 @@ import SimpleKeychain
 @MainActor
 public final class AuthenticationService: ObservableObject {
   private let audiobookshelf: Audiobookshelf
-  private let keychain = SimpleKeychain(service: "com.inceptyon.siren") // SIREN: Siren identifiers
+  private let keychain = SimpleKeychain(service: "com.inceptyon.siren")  // SIREN: Siren identifiers
 
   enum Keys {
     static let connections = "audiobookshelf_server_connections"

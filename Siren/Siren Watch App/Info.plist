@@ -12,9 +12,9 @@
 		</dict>
 		<dict>
 			<key>INAlternativeAppName</key>
-			<string>ABS</string>
+			<string>Siren</string>
 			<key>INAlternativeAppNamePronunciationHint</key>
-			<string>ABS</string>
+			<string>Siren</string>
 		</dict>
 		<dict>
 			<key>INAlternativeAppName</key>
@@ -29,7 +29,7 @@
 		<true/>
 	</dict>
 	<key>CFBundleDisplayName</key>
-	<string>Siren</string>
+	<string>Siren Books</string>
 	<key>WKCompanionAppBundleIdentifier</key>
 	<string>$(ORG_IDENTIFIER).siren</string>
 	<key>NSLocalNetworkUsageDescription</key>

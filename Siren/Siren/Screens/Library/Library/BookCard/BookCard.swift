@@ -396,6 +396,7 @@ extension BookCard {
     let isExplicit: Bool
     var timeRemaining: TimeInterval?
     var summary: String?
+    var asin: String?  // SIREN: Audible ratings
 
     func onAppear() {}
 

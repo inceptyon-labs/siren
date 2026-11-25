@@ -74,14 +74,14 @@ struct SettingsView: View {
 
         Section {
           externalLink(
-            url: "https://inceptyon.io/siren/support", // SIREN: Siren name
+            url: "https://inceptyon.io/siren/support",  // SIREN: Siren name
             systemImage: "questionmark.bubble",
             tint: .blue,
             title: "Help & Feedback"
           )
           // SIREN: upstream's Discord link removed
           externalLink(
-            url: "mailto:support@inceptyon.io", // SIREN: Siren name
+            url: "mailto:support@inceptyon.io",  // SIREN: Siren name
             systemImage: "envelope",
             tint: .orange,
             title: "Email Support"
@@ -98,10 +98,17 @@ struct SettingsView: View {
             title: "Terms of Use"
           )
           externalLink(
-            url: "https://inceptyon.io/siren/privacy", // SIREN: Siren name
+            url: "https://inceptyon.io/siren/privacy",  // SIREN: Siren name
             systemImage: "hand.raised",
             tint: .brown,
             title: "Privacy Policy"
+          )
+          // SIREN: source link, for the MPL and AGPL
+          externalLink(
+            url: "https://github.com/inceptyon-labs/siren",
+            systemImage: "chevron.left.forwardslash.chevron.right",
+            tint: .gray,
+            title: "Source Code"
           )
         } header: {
           Text("Legal")
@@ -206,7 +213,7 @@ struct SettingsView: View {
 
 extension SettingsView {
   @Observable class Model: ObservableObject {
-    var navigationPath = NavigationPath() // SIREN: tip jar model removed
+    var navigationPath = NavigationPath()  // SIREN: tip jar model removed
     var playbackSessionList: PlaybackSessionListView.Model?
     var storagePreferences: StoragePreferencesView.Model?
 

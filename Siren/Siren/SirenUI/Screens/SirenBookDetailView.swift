@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Book detail for the design review, bound to demo data.
 struct SirenBookDetailView: View {
-  let book: DemoBook
+  let book: SirenBook
   var onSend: () -> Void
   var onPlay: () -> Void
 
@@ -72,19 +72,12 @@ struct SirenBookDetailView: View {
   }
 
   private var ratings: some View {
-    VStack(spacing: 4) {
-      HStack(spacing: 4) {
-        StarRating(rating: book.rating, count: book.ratingCount)
-        Text("on Audible")
-          .font(.footnote)
-          .foregroundStyle(SirenTheme.secondary)
-      }
-      Text("Story \(oneDecimal(min(5, book.rating + 0.1))) · Performance \(oneDecimal(max(0, book.rating - 0.1)))")
-        .font(.footnote)
-        .foregroundStyle(SirenTheme.secondary)
-        .monospacedDigit()
-    }
-    .accessibilityElement(children: .combine)
+    SirenRatingSummary(
+      rating: book.rating,
+      count: book.ratingCount,
+      story: min(5, book.rating + 0.1),
+      performance: max(0, book.rating - 0.1)
+    )
   }
 
   private var actions: some View {
@@ -98,13 +91,15 @@ struct SirenBookDetailView: View {
           }
           .buttonStyle(BookDetailCapsuleStyle(kind: .wash))
 
-          Button {} label: {
+          Button {
+          } label: {
             Image(systemName: "arrow.down.circle")
           }
           .buttonStyle(BookDetailCapsuleStyle(kind: .wash))
           .accessibilityLabel("Download")
 
-          Button {} label: {
+          Button {
+          } label: {
             Image(systemName: "bookmark")
           }
           .buttonStyle(BookDetailCapsuleStyle(kind: .wash))
@@ -192,7 +187,7 @@ struct SirenBookDetailView: View {
 
   // MARK: Series
 
-  private var seriesBooks: [DemoBook] {
+  private var seriesBooks: [SirenBook] {
     guard let series = book.series else { return [] }
     return Demo.tidewater
       .filter { $0.series == series }
@@ -217,7 +212,7 @@ struct SirenBookDetailView: View {
     }
   }
 
-  private func seriesItem(_ item: DemoBook) -> some View {
+  private func seriesItem(_ item: SirenBook) -> some View {
     VStack(alignment: .leading, spacing: 6) {
       if item.id == book.id {
         seriesTile(item)
@@ -232,7 +227,7 @@ struct SirenBookDetailView: View {
     .frame(width: seriesCoverSide, alignment: .leading)
   }
 
-  private func seriesTile(_ item: DemoBook) -> some View {
+  private func seriesTile(_ item: SirenBook) -> some View {
     VStack(alignment: .leading, spacing: 8) {
       RevealCover(book: item)
         .frame(width: seriesCoverSide, height: seriesCoverSide)
@@ -248,7 +243,7 @@ struct SirenBookDetailView: View {
     .accessibilityLabel(item.seriesIndex.map { "\(item.title), book \($0)" } ?? item.title)
   }
 
-  @ViewBuilder private func seriesStatus(_ item: DemoBook) -> some View {
+  @ViewBuilder private func seriesStatus(_ item: SirenBook) -> some View {
     switch shelfState(of: item) {
     case .finished(let date):
       caption(date.map { "Finished \($0)" } ?? "Finished")
@@ -355,7 +350,9 @@ struct SirenBookDetailView: View {
     if book.chapterCount > 1 {
       rows.append(DetailRow(label: "Chapters", value: "\(book.chapterCount)"))
     }
-    rows.append(DetailRow(label: "Genre", value: book.genre))
+    if !book.genre.isEmpty {
+      rows.append(DetailRow(label: "Genre", value: book.genre))
+    }
     if let added = book.detailAddedOn {
       rows.append(DetailRow(label: "Added", value: added))
     }
@@ -378,7 +375,7 @@ struct SirenBookDetailView: View {
     case requestable(releaseDate: String?)
   }
 
-  private func shelfState(of item: DemoBook) -> ShelfState {
+  private func shelfState(of item: SirenBook) -> ShelfState {
     if item.inLibrary {
       if item.isFinished { return .finished(item.finishedOn) }
       if item.isStarted { return .playing(item.progress) }
@@ -396,10 +393,6 @@ struct SirenBookDetailView: View {
     "\(Int((value * 100).rounded()))%"
   }
 
-  private func oneDecimal(_ value: Double) -> String {
-    value.formatted(.number.precision(.fractionLength(1)))
-  }
-
   private func lengthText(_ hours: Double) -> String {
     let minutes = Int((hours * 60).rounded())
     return "\(minutes / 60)h \(minutes % 60)m"
@@ -407,7 +400,7 @@ struct SirenBookDetailView: View {
 }
 
 /// Shows the book title in the navigation bar only once the hero title has scrolled under it.
-private struct BookDetailNavigationTitle: ViewModifier {
+struct BookDetailNavigationTitle: ViewModifier {
   let title: String
   let revealOffset: CGFloat
 
@@ -451,7 +444,7 @@ private struct BookDetailNavigationTitle: ViewModifier {
   }
 }
 
-private struct BookDetailCapsuleStyle: ButtonStyle {
+struct BookDetailCapsuleStyle: ButtonStyle {
   enum Kind { case filled, wash }
 
   var kind: Kind
@@ -471,7 +464,7 @@ private struct BookDetailCapsuleStyle: ButtonStyle {
   }
 }
 
-private extension DemoBook {
+private extension SirenBook {
   /// Synthetic jacket copy for the demo books.
   var detailBlurb: String {
     switch id {
@@ -499,4 +492,40 @@ private extension DemoBook {
     SirenBookDetailView(book: Demo.saltRoad, onSend: {}, onPlay: {})
   }
   .tint(SirenTheme.tint)
+}
+
+/// Audible's rating under a book's title: the stars and count, then story and performance.
+struct SirenRatingSummary: View {
+  let rating: Double
+  let count: Int
+  var story: Double?
+  var performance: Double?
+
+  var body: some View {
+    VStack(spacing: 4) {
+      ViewThatFits(in: .horizontal) {
+        HStack(spacing: 4) {
+          StarRating(rating: rating, count: count)
+          Text("on Audible")
+        }
+        VStack(spacing: 2) {
+          StarRating(rating: rating, count: count)
+          Text("on Audible")
+        }
+      }
+      .font(.footnote)
+      .foregroundStyle(SirenTheme.secondary)
+      if let story, let performance {
+        Text("Story \(oneDecimal(story)) · Performance \(oneDecimal(performance))")
+          .font(.footnote)
+          .foregroundStyle(SirenTheme.secondary)
+          .monospacedDigit()
+      }
+    }
+    .accessibilityElement(children: .combine)
+  }
+
+  private func oneDecimal(_ value: Double) -> String {
+    value.formatted(.number.precision(.fractionLength(1)))
+  }
 }

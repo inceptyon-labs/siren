@@ -46,7 +46,7 @@ struct WatchComplicationState: Codable {
 }
 
 enum WatchComplicationStorage {
-  private static let suiteName = "group.com.inceptyon.siren" // SIREN: Siren identifiers
+  private static let suiteName = "group.com.inceptyon.siren"  // SIREN: Siren identifiers
   private static let stateKey = "watchComplicationState"
 
   static var sharedDefaults: UserDefaults? {

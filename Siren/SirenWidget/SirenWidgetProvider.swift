@@ -50,7 +50,7 @@ struct SirenWidgetProvider: TimelineProvider {
 
   @MainActor
   private func getCurrentBookEntry(for family: WidgetFamily) async -> SirenWidgetEntry {
-    let sharedDefaults = UserDefaults(suiteName: "group.com.inceptyon.siren") // SIREN: Siren identifiers
+    let sharedDefaults = UserDefaults(suiteName: "group.com.inceptyon.siren")  // SIREN: Siren identifiers
 
     let playbackState = sharedDefaults?.data(forKey: "playbackState")
       .flatMap { try? JSONDecoder().decode(PlaybackState.self, from: $0) }
@@ -73,7 +73,7 @@ struct SirenWidgetProvider: TimelineProvider {
 
   @MainActor
   private func fetchRecentBooks(loadImages: Bool) async -> ([BookListEntry], [String: UIImage]) {
-    let sharedDefaults = UserDefaults(suiteName: "group.com.inceptyon.siren") // SIREN: Siren identifiers
+    let sharedDefaults = UserDefaults(suiteName: "group.com.inceptyon.siren")  // SIREN: Siren identifiers
 
     guard let data = sharedDefaults?.data(forKey: "recentBooks"),
       let books = try? JSONDecoder().decode([BookListEntry].self, from: data)

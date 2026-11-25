@@ -47,14 +47,11 @@ public final class NetworkDiscoveryService: @unchecked Sendable {
   }
 
   private func getNetworkRanges() async -> [[String]] {
-    let ranges: [[String]] = [
-      generateIPRange(base: "192.168.1", start: 1, end: 254),
-      generateIPRange(base: "192.168.0", start: 1, end: 254),
-      generateIPRange(base: "10.0.0", start: 1, end: 254),
-      generateIPRange(base: "10.0.1", start: 1, end: 254),
-      ["127.0.0.1"],
-    ]
-    return ranges
+    // SIREN: scan the device's own networks first, not only four fixed subnets
+    var seen = Set<String>()
+    let bases = (LocalSubnet.prefixes() + ["192.168.1", "192.168.0", "10.0.0", "10.0.1"])
+      .filter { seen.insert($0).inserted }
+    return bases.map { generateIPRange(base: $0, start: 1, end: 254) } + [["127.0.0.1"]]
   }
 
   private func generateIPRange(base: String, start: Int, end: Int) -> [String] {

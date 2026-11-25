@@ -24,7 +24,11 @@ struct SirenLibraryView: View {
         if scope == .books {
           LazyVGrid(columns: columns, alignment: .leading, spacing: 22) {
             ForEach(books) { book in
-              SirenLibraryCell(book: book)
+              Button {
+              } label: {
+                SirenLibraryCell(book: book)
+              }
+              .buttonStyle(.plain)
             }
           }
         } else {
@@ -74,12 +78,13 @@ struct SirenLibraryView: View {
       Label(
         "Sort and filter",
         systemImage: shelfFilter == .all
-          ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+          ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill"
+      )
     }
   }
 
   /// Demo.library repeats two titles from the finished shelf; show each book once.
-  private var books: [DemoBook] {
+  private var books: [SirenBook] {
     var seen = Set<String>()
     let shelf = Demo.library.filter { seen.insert($0.title).inserted }
     let shown = shelf.filter { shelfFilter.includes($0) }
@@ -94,19 +99,25 @@ struct SirenLibraryView: View {
   }
 }
 
-private struct SirenLibraryCell: View {
-  let book: DemoBook
+/// A grid cell: cover, title and where you are in the book. Wrap it in a link or button.
+struct SirenLibraryCell: View {
+  let book: SirenBook
+  /// Shows Audible's rating beside the caption, when the book has one.
+  var showsRating = false
 
   var body: some View {
-    Button {} label: {
-      VStack(alignment: .leading, spacing: 8) {
-        RevealCover(book: book)
-        VStack(alignment: .leading, spacing: 2) {
-          Text(book.title)
-            .font(SirenType.bookTitle(.footnote))
-            .foregroundStyle(SirenTheme.ink)
-            .multilineTextAlignment(.leading)
-            .lineLimit(2, reservesSpace: true)
+    VStack(alignment: .leading, spacing: 8) {
+      RevealCover(book: book)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(book.title)
+          .font(SirenType.bookTitle(.footnote))
+          .foregroundStyle(SirenTheme.ink)
+          .multilineTextAlignment(.leading)
+          .lineLimit(2, reservesSpace: true)
+        HStack(spacing: 6) {
+          if isRated {
+            StarRating(rating: book.rating, count: book.ratingCount, compact: true)
+          }
           Text(caption)
             .font(.caption)
             .foregroundStyle(SirenTheme.secondary)
@@ -114,19 +125,23 @@ private struct SirenLibraryCell: View {
             .lineLimit(1)
         }
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .contentShape(Rectangle())
     }
-    .buttonStyle(.plain)
-    .accessibilityLabel(Text("\(book.title), \(book.author)"))
-    .accessibilityValue(spokenStatus)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .contentShape(Rectangle())
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(Text(book.author.isEmpty ? book.title : "\(book.title), \(book.author)"))
+    .accessibilityValue(
+      isRated ? "\(spokenStatus), rated \(book.rating.formatted(.number.precision(.fractionLength(1))))" : spokenStatus
+    )
   }
+
+  private var isRated: Bool { showsRating && book.rating > 0 }
 
   private var caption: String {
     if book.isFinished { return String(localized: "Finished") }
     if book.isStarted { return book.progress.formatted(.percent.precision(.fractionLength(0))) }
-    let minutes = Int((book.hours * 60).rounded())
-    return String(localized: "\(minutes / 60)h \(minutes % 60)m")
+    if book.hours <= 0 { return book.author }
+    return SirenFormat.span(book.hours * 3600)
   }
 
   private var spokenStatus: String {
@@ -138,8 +153,8 @@ private struct SirenLibraryCell: View {
   }
 }
 
-private enum SirenLibraryScope: CaseIterable, Identifiable {
-  case books, series, authors
+enum SirenLibraryScope: CaseIterable, Identifiable {
+  case books, series, authors, playlists
 
   var id: Self { self }
 
@@ -148,6 +163,7 @@ private enum SirenLibraryScope: CaseIterable, Identifiable {
     case .books: "Books"
     case .series: "Series"
     case .authors: "Authors"
+    case .playlists: "Playlists"
     }
   }
 
@@ -156,6 +172,7 @@ private enum SirenLibraryScope: CaseIterable, Identifiable {
     case .books: "books.vertical"
     case .series: "square.stack"
     case .authors: "person.2"
+    case .playlists: "music.note.list"
     }
   }
 }
@@ -188,7 +205,7 @@ private enum SirenLibraryFilter: CaseIterable, Identifiable {
     }
   }
 
-  func includes(_ book: DemoBook) -> Bool {
+  func includes(_ book: SirenBook) -> Bool {
     switch self {
     case .all: true
     case .inProgress: book.isStarted && !book.isFinished

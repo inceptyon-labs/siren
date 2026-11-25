@@ -8,7 +8,7 @@
 		<string>com.inceptyon.siren.dismiss-sleep-timer-activity</string>
 	</array>
 	<key>CFBundleDisplayName</key>
-	<string>Siren</string>
+	<string>Siren Books</string>
 	<key>CFBundleGetInfoString</key>
 	<string></string>
 	<key>CFBundleURLTypes</key>
@@ -28,15 +28,15 @@
 	<array>
 		<dict>
 			<key>INAlternativeAppName</key>
-			<string>Audiobook</string>
+			<string>Siren</string>
 			<key>INAlternativeAppNamePronunciationHint</key>
-			<string>Audiobook</string>
+			<string>Siren</string>
 		</dict>
 		<dict>
 			<key>INAlternativeAppName</key>
-			<string>ABS</string>
+			<string>Audiobook</string>
 			<key>INAlternativeAppNamePronunciationHint</key>
-			<string>ABS</string>
+			<string>Audiobook</string>
 		</dict>
 		<dict>
 			<key>INAlternativeAppName</key>
@@ -58,6 +58,8 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Siren uses the camera to read a page of your printed book so it can find that spot in the audiobook. No photos are saved or sent anywhere.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Siren uses Face ID to keep a profile private, and to keep kids in the kids profile.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Siren needs access to your local network to connect to your Audiobookshelf server and stream audiobooks.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

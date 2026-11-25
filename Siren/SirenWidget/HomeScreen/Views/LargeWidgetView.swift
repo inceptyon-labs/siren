@@ -17,7 +17,7 @@ struct LargeWidgetView: View {
 
       VStack(spacing: 10) {
         ForEach(Array(books.enumerated()), id: \.element.bookID) { index, book in
-          Link(destination: URL(string: "siren://open/\(book.bookID)")!) { // SIREN: Siren identifiers
+          Link(destination: URL(string: "siren://open/\(book.bookID)")!) {  // SIREN: Siren identifiers
             BookRow(entry: entry, book: book)
           }
           .buttonStyle(.plain)

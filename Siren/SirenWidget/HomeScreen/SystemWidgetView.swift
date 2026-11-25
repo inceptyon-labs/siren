@@ -12,14 +12,14 @@ struct SystemWidgetView: View {
       case .systemSmall:
         if let playbackState = entry.playbackState {
           SmallWidgetView(entry: entry, playbackState: playbackState)
-            .widgetURL(URL(string: "siren://open/\(playbackState.bookID)")) // SIREN: Siren identifiers
+            .widgetURL(URL(string: "siren://open/\(playbackState.bookID)"))  // SIREN: Siren identifiers
         } else {
           emptyStateView
         }
       case .systemMedium:
         if let playbackState = entry.playbackState {
           MediumWidgetView(entry: entry, playbackState: playbackState)
-            .widgetURL(URL(string: "siren://open/\(playbackState.bookID)")) // SIREN: Siren identifiers
+            .widgetURL(URL(string: "siren://open/\(playbackState.bookID)"))  // SIREN: Siren identifiers
         } else {
           emptyStateView
         }
@@ -32,7 +32,7 @@ struct SystemWidgetView: View {
       default:
         if let playbackState = entry.playbackState {
           SmallWidgetView(entry: entry, playbackState: playbackState)
-            .widgetURL(URL(string: "siren://open/\(playbackState.bookID)")) // SIREN: Siren identifiers
+            .widgetURL(URL(string: "siren://open/\(playbackState.bookID)"))  // SIREN: Siren identifiers
         } else {
           emptyStateView
         }

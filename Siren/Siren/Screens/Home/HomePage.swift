@@ -190,7 +190,8 @@ struct HomePage: View {
           .foregroundColor(.primary)
 
         Text(
-          "Siren plays the audiobooks and podcasts on your Audiobookshelf server. Connect one to start listening." // SIREN: Siren name
+          // SIREN: Siren name
+          "Siren plays the audiobooks and podcasts on your Audiobookshelf server. Connect one to start listening."
         )
         .font(.body)
         .foregroundColor(.secondary)

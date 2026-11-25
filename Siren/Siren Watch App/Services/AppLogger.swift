@@ -1,7 +1,8 @@
 import OSLog
 
 enum AppLogger {
-  private static let subsystem = Bundle.main.bundleIdentifier ?? "com.inceptyon.siren.watchkitapp" // SIREN: Siren identifiers
+  // SIREN: Siren identifiers
+  private static let subsystem = Bundle.main.bundleIdentifier ?? "com.inceptyon.siren.watchkitapp"
 
   static let watchConnectivity = Logger(subsystem: subsystem, category: "watch-connectivity")
   static let player = Logger(subsystem: subsystem, category: "player")

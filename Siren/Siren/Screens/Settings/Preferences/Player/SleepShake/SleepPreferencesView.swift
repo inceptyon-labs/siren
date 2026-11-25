@@ -62,7 +62,8 @@ struct SleepPreferencesView: View {
             AutoTimerTriggerRow(selection: $preferences.autoTimerTrigger)
             if preferences.autoTimerTrigger != .timeWindow {
               Text(
-                "Add Siren to any Focus under Settings → Focus → Focus Filters. The timer starts whenever that Focus is on." // SIREN: Siren name
+                // SIREN: Siren name
+                "Add Siren to any Focus under Settings → Focus → Focus Filters. The timer starts whenever that Focus is on."
               )
               .font(.caption)
               .foregroundStyle(.secondary)

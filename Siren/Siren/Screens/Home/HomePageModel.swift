@@ -527,7 +527,7 @@ extension HomePageModel {
       let coverURL: URL?
     }
 
-    let sharedDefaults = UserDefaults(suiteName: "group.com.inceptyon.siren") // SIREN: Siren identifiers
+    let sharedDefaults = UserDefaults(suiteName: "group.com.inceptyon.siren")  // SIREN: Siren identifiers
 
     do {
       let allProgress = try MediaProgress.fetchAll()

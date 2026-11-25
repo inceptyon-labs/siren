@@ -18,8 +18,8 @@ public final class SessionService {
 
     var clientName: String {
       switch self {
-      case .player: "Siren iOS" // SIREN: Siren name
-      case .watch: "Siren Watch" // SIREN: Siren name
+      case .player: "Siren iOS"  // SIREN: Siren name
+      case .watch: "Siren Watch"  // SIREN: Siren name
       }
     }
 
