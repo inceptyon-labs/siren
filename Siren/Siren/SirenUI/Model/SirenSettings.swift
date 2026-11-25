@@ -18,4 +18,8 @@ enum SirenSettings {
   static let kidsProfiles = "siren.profiles.kids"
   /// The profile to return to if a Face ID check for a switch doesn't pass (set while it's open).
   static let pendingProfileCheck = "siren.profiles.pendingCheck"
+  /// Library books sorted by Audible rating, highest first.
+  static let sortByRating = "siren.library.sortByRating"
+  /// Library books rated at least this on Audible (0 for any).
+  static let minimumRating = "siren.library.minimumRating"
 }

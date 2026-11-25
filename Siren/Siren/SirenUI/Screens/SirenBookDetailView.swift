@@ -72,25 +72,12 @@ struct SirenBookDetailView: View {
   }
 
   private var ratings: some View {
-    VStack(spacing: 4) {
-      ViewThatFits(in: .horizontal) {
-        HStack(spacing: 4) {
-          StarRating(rating: book.rating, count: book.ratingCount)
-          Text("on Audible")
-        }
-        VStack(spacing: 2) {
-          StarRating(rating: book.rating, count: book.ratingCount)
-          Text("on Audible")
-        }
-      }
-      .font(.footnote)
-      .foregroundStyle(SirenTheme.secondary)
-      Text("Story \(oneDecimal(min(5, book.rating + 0.1))) · Performance \(oneDecimal(max(0, book.rating - 0.1)))")
-        .font(.footnote)
-        .foregroundStyle(SirenTheme.secondary)
-        .monospacedDigit()
-    }
-    .accessibilityElement(children: .combine)
+    SirenRatingSummary(
+      rating: book.rating,
+      count: book.ratingCount,
+      story: min(5, book.rating + 0.1),
+      performance: max(0, book.rating - 0.1)
+    )
   }
 
   private var actions: some View {
@@ -406,10 +393,6 @@ struct SirenBookDetailView: View {
     "\(Int((value * 100).rounded()))%"
   }
 
-  private func oneDecimal(_ value: Double) -> String {
-    value.formatted(.number.precision(.fractionLength(1)))
-  }
-
   private func lengthText(_ hours: Double) -> String {
     let minutes = Int((hours * 60).rounded())
     return "\(minutes / 60)h \(minutes % 60)m"
@@ -509,4 +492,40 @@ private extension SirenBook {
     SirenBookDetailView(book: Demo.saltRoad, onSend: {}, onPlay: {})
   }
   .tint(SirenTheme.tint)
+}
+
+/// Audible's rating under a book's title: the stars and count, then story and performance.
+struct SirenRatingSummary: View {
+  let rating: Double
+  let count: Int
+  var story: Double?
+  var performance: Double?
+
+  var body: some View {
+    VStack(spacing: 4) {
+      ViewThatFits(in: .horizontal) {
+        HStack(spacing: 4) {
+          StarRating(rating: rating, count: count)
+          Text("on Audible")
+        }
+        VStack(spacing: 2) {
+          StarRating(rating: rating, count: count)
+          Text("on Audible")
+        }
+      }
+      .font(.footnote)
+      .foregroundStyle(SirenTheme.secondary)
+      if let story, let performance {
+        Text("Story \(oneDecimal(story)) · Performance \(oneDecimal(performance))")
+          .font(.footnote)
+          .foregroundStyle(SirenTheme.secondary)
+          .monospacedDigit()
+      }
+    }
+    .accessibilityElement(children: .combine)
+  }
+
+  private func oneDecimal(_ value: Double) -> String {
+    value.formatted(.number.precision(.fractionLength(1)))
+  }
 }

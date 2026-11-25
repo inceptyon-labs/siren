@@ -102,6 +102,8 @@ struct SirenLibraryView: View {
 /// A grid cell: cover, title and where you are in the book. Wrap it in a link or button.
 struct SirenLibraryCell: View {
   let book: SirenBook
+  /// Shows Audible's rating beside the caption, when the book has one.
+  var showsRating = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -112,19 +114,28 @@ struct SirenLibraryCell: View {
           .foregroundStyle(SirenTheme.ink)
           .multilineTextAlignment(.leading)
           .lineLimit(2, reservesSpace: true)
-        Text(caption)
-          .font(.caption)
-          .foregroundStyle(SirenTheme.secondary)
-          .monospacedDigit()
-          .lineLimit(1)
+        HStack(spacing: 6) {
+          if isRated {
+            StarRating(rating: book.rating, count: book.ratingCount, compact: true)
+          }
+          Text(caption)
+            .font(.caption)
+            .foregroundStyle(SirenTheme.secondary)
+            .monospacedDigit()
+            .lineLimit(1)
+        }
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .contentShape(Rectangle())
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(Text(book.author.isEmpty ? book.title : "\(book.title), \(book.author)"))
-    .accessibilityValue(spokenStatus)
+    .accessibilityValue(
+      isRated ? "\(spokenStatus), rated \(book.rating.formatted(.number.precision(.fractionLength(1))))" : spokenStatus
+    )
   }
+
+  private var isRated: Bool { showsRating && book.rating > 0 }
 
   private var caption: String {
     if book.isFinished { return String(localized: "Finished") }

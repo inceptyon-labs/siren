@@ -54,6 +54,7 @@ struct SirenLiveSearch: View {
       catalogHasMore = false
     }
     .task(id: CatalogQuery(text: model.searchText, scope: scope)) { await searchCatalog() }
+    .task(id: model.books.map(\.id)) { await AudibleRatings.shared.load(model.books.compactMap(\.asin)) }
     .onAppear { requests.sync() }
     .overlay {
       if scope == .request {
@@ -170,7 +171,7 @@ struct SirenLiveSearch: View {
       Section("Books") {
         ForEach(model.books, id: \.id) { card in
           NavigationLink(value: NavigationDestination.book(id: card.id)) {
-            SirenSearchBookRow(book: SirenBook(card: card))
+            SirenSearchBookRow(book: Self.book(card))
           }
           .listRowBackground(SirenTheme.raised)
         }
@@ -213,6 +214,12 @@ struct SirenLiveSearch: View {
     }
   }
 
+  private static func book(_ card: BookCard.Model) -> SirenBook {
+    var book = SirenBook(card: card)
+    book.apply(AudibleRatings.shared.rating(for: card.asin))
+    return book
+  }
+
   private var isEmpty: Bool {
     model.books.isEmpty && model.series.isEmpty && model.authors.isEmpty && model.narrators.isEmpty
       && model.genres.isEmpty && model.tags.isEmpty
@@ -245,13 +252,20 @@ private struct SirenSearchBookRow: View {
             .foregroundStyle(SirenTheme.secondary)
             .lineLimit(1)
         }
-        if book.isFinished {
-          Text("Finished").font(.caption).foregroundStyle(SirenTheme.secondary)
-        } else if book.isStarted {
-          Text("\(Int((book.progress * 100).rounded()))% listened")
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(SirenTheme.tint)
-            .monospacedDigit()
+        if book.rating > 0 || book.isStarted {
+          HStack(spacing: 8) {
+            if book.rating > 0 {
+              StarRating(rating: book.rating, count: book.ratingCount, compact: true)
+            }
+            if book.isFinished {
+              Text("Finished").font(.caption).foregroundStyle(SirenTheme.secondary)
+            } else if book.isStarted {
+              Text("\(Int((book.progress * 100).rounded()))% listened")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(SirenTheme.tint)
+                .monospacedDigit()
+            }
+          }
         }
       }
     }

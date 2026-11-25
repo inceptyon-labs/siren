@@ -18,8 +18,10 @@ struct SirenBook: Identifiable, Hashable {
   var chapterProgress: Double = 0
   var chapterRemaining = ""
   var timeLeft = ""
+  /// Audible's average rating, 0 when unrated.
   var rating: Double = 0
   var ratingCount = 0
+  var asin: String?
   var genre = ""
   /// Drawn jacket: the whole cover in demo data, the fallback when a server cover is missing.
   var cover: CoverSpec

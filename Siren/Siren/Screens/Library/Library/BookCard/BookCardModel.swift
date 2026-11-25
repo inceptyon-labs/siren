@@ -115,6 +115,7 @@ final class BookCardModel: BookCard.Model {
     )
 
     setupDownloadProgressObserver(showsIndicator: true)
+    asin = item.media.metadata.asin  // SIREN: Audible ratings
 
     contextMenu = BookCardContextMenuModel(
       item,

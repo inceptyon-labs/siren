@@ -72,6 +72,9 @@ struct SirenLiveBookDetail: View {
     .onAppear(perform: model.onAppear)
     .task(id: model.series.first?.id) { loadSeries() }
     .task(id: model.bookID) { isLiked = (try? await Likes.likedIDs())?.contains(model.bookID) }
+    .task(id: model.asin) {
+      if let asin = model.asin { await AudibleRatings.shared.load([asin]) }
+    }
     .fullScreenCover(item: $model.ebookReader) { reader in
       NavigationStack {
         EbookReaderView(model: reader)
@@ -186,6 +189,16 @@ struct SirenLiveBookDetail: View {
           .foregroundStyle(SirenTheme.secondary)
           .multilineTextAlignment(.center)
           .padding(.top, 2)
+      }
+
+      if let rating = AudibleRatings.shared.rating(for: model.asin) {
+        SirenRatingSummary(
+          rating: rating.average,
+          count: rating.count,
+          story: rating.story,
+          performance: rating.performance
+        )
+        .padding(.top, 14)
       }
 
       actions(book)

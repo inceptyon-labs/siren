@@ -1,6 +1,7 @@
 import API
 import Foundation
 import Models
+import SirenKit
 
 // Builds `SirenBook` values from upstream's view models, so the Siren screens draw real books.
 
@@ -20,6 +21,7 @@ extension SirenBook {
   init(card: BookCard.Model) {
     self.init(id: card.id, title: card.title, author: card.author, coverURL: card.cover.url)
     narrator = card.narrator ?? ""
+    asin = card.asin
     progress = card.cover.progress ?? 0
     seriesIndex = card.sequence.flatMap { Int($0) }
     if let remaining = card.timeRemaining, progress > 0 {
@@ -27,6 +29,21 @@ extension SirenBook {
     } else if let remaining = card.timeRemaining {
       hours = remaining / 3600
     }
+  }
+
+  /// A library book fetched directly, outside upstream's card models.
+  @MainActor init(book: Book) {
+    self.init(id: book.id, title: book.title, author: book.authorName, coverURL: book.coverURL())
+    narrator = book.media.metadata.narratorName ?? ""
+    asin = book.media.metadata.asin
+    progress = MediaProgress.progress(for: book.id)
+    hours = book.duration / 3600
+  }
+
+  /// Audible's rating, once loaded.
+  mutating func apply(_ rating: AudibleRatings.Rating?) {
+    self.rating = rating?.average ?? 0
+    ratingCount = rating?.count ?? 0
   }
 
   /// A series tile: its first cover, its name and how many books it has.
