@@ -12,6 +12,8 @@ struct SirenLivePlayer: View {
   @AppStorage(SirenSettings.voiceBoost) private var voiceBoost = false
   @AppStorage(SirenSettings.trimSilence) private var trimSilence = false
   @AppStorage(SirenSettings.trimSilenceSaved) private var trimSaved = 0.0
+  @AppStorage(SirenSettings.recaps) private var recapsOn = true
+  @State private var recaps = SirenRecaps.shared
   @State private var art: PlayerArt = .cover
   @State private var showingSend = false
   /// The book's files and chapters, when it's downloaded and the voice print is chosen.
@@ -39,6 +41,16 @@ struct SirenLivePlayer: View {
     .onChange(of: preferences.keepScreenAwakeInPlayer) { _, newValue in
       UIApplication.shared.isIdleTimerDisabled = newValue
     }
+    .overlay(alignment: .top) {
+      if let recap = recaps.pending, recap.bookID == model.id {
+        // Inside the art, which is inset 24 pt and starts 28 pt down.
+        SirenRecapCard(recap: recap)
+          .padding(.horizontal, 36)
+          .padding(.top, 40)
+          .transition(.move(edge: .top).combined(with: .opacity))
+      }
+    }
+    .animation(.snappy, value: recaps.pending)
     .modifier(SirenPlayerSheets(model: model))
     .sheet(isPresented: $showingSend) {
       SirenLiveSendSheet(book: SirenBook(player: model))
@@ -123,6 +135,16 @@ struct SirenLivePlayer: View {
         Text(trimLabel)
       } icon: {
         Image(systemName: "waveform.badge.minus")
+      }
+    }
+    if SirenRecaps.isSupported {
+      Toggle(isOn: $recapsOn) {
+        Label {
+          Text("Recaps")
+          Text("When you come back to a book")
+        } icon: {
+          Image(systemName: "text.quote")
+        }
       }
     }
     Button("Player Settings", systemImage: "gearshape") { model.isSettingsPresented = true }

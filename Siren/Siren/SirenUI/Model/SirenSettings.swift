@@ -28,4 +28,6 @@ enum SirenSettings {
   static let trimSilence = "siren.player.trimSilence"
   /// Listening time trim silence has saved, in seconds.
   static let trimSilenceSaved = "siren.player.trimSilenceSaved"
+  /// "Previously on" recaps when you come back to a book (on unless turned off).
+  static let recaps = "siren.player.recaps"
 }

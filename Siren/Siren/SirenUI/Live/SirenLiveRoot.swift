@@ -68,6 +68,7 @@ struct SirenLiveRoot: View {
       }
       .onAppear(perform: checkStartup)
       .task(id: profiles.activeID) { await SirenProfiles.ensureLibrary() }
+      .task { SirenRecaps.shared.start() }
       .onChange(of: libraries.current) { _, _ in
         showingServerList = false
         showingOnboarding = false
