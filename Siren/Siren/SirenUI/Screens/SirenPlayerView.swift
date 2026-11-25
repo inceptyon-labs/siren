@@ -38,6 +38,8 @@ struct SirenPlayerView<MoreMenu: View>: View {
   var pages: [PlayerArt] = PlayerArt.allCases
   /// Bookmarks as fractions of the book, planted as flags on the map.
   var flags: [Double] = []
+  /// The voice print's ridges from the book's audio; nil draws the demo's.
+  var voiceRidges: [[Double]?]?
   @Binding var art: PlayerArt
   @ViewBuilder var moreMenu: () -> MoreMenu
 
@@ -158,7 +160,7 @@ struct SirenPlayerView<MoreMenu: View>: View {
       FogMapArt(book: book, flags: flags)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     case .voice:
-      VoicePrintView(book: book)
+      VoicePrintView(book: book, ridges: voiceRidges)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
   }
@@ -295,10 +297,13 @@ struct SirenPlayerView<MoreMenu: View>: View {
 }
 
 /// One ridgeline per chapter. Heard chapters are inked; the current one up to the playhead.
-/// Demo envelopes are synthetic, seeded from the book ID; the real ones come from the
-/// loudness scan that trim silence already needs.
+/// Ridges come from the book's audio (`SirenVoicePrint`); a chapter not read yet is a flat dotted
+/// line. Without ridges (the demo), envelopes are synthetic, seeded from the book ID.
 struct VoicePrintView: View {
+  static let samples = 150
+
   let book: SirenBook
+  var ridges: [[Double]?]?
 
   var body: some View {
     ZStack(alignment: .topTrailing) {
@@ -309,7 +314,7 @@ struct VoicePrintView: View {
         let top: CGFloat = 70
         let spacing = (size.height - top - 14) / CGFloat(count)
         let peak = spacing * 2.3
-        let samples = 150
+        let samples = Self.samples
         let ink = Color(sirenHex: 0xF2F2F0)
         let faint = Color(sirenHex: 0xA3A8B2)
         let ground = Color(sirenHex: 0x1C1F24)
@@ -318,7 +323,7 @@ struct VoicePrintView: View {
 
         for chapter in 0..<count {
           let baseline = top + spacing * CGFloat(chapter + 1)
-          let env = envelope(chapter: chapter, samples: samples)
+          let (env, isRead) = ridge(chapter, samples: samples)
           var line = Path()
           for (i, v) in env.enumerated() {
             let x = left + (right - left) * CGFloat(i) / CGFloat(samples - 1)
@@ -332,14 +337,16 @@ struct VoicePrintView: View {
           ctx.fill(fill, with: .color(ground))
 
           let number = chapter + 1
-          if number < book.currentChapter {
+          if number < book.currentChapter, isRead {
             ctx.stroke(line, with: .color(ink), lineWidth: 1.1)
           } else if number == book.currentChapter {
             let head = left + (right - left) * book.chapterProgress
             ctx.stroke(line, with: .color(faint.opacity(0.35)), style: StrokeStyle(lineWidth: 1, dash: [1, 2.5]))
-            var heard = ctx
-            heard.clip(to: Path(CGRect(x: 0, y: 0, width: head, height: size.height)))
-            heard.stroke(line, with: .color(ink), lineWidth: 1.1)
+            if isRead {
+              var heard = ctx
+              heard.clip(to: Path(CGRect(x: 0, y: 0, width: head, height: size.height)))
+              heard.stroke(line, with: .color(ink), lineWidth: 1.1)
+            }
             let index = Int(book.chapterProgress * Double(samples - 1))
             let y = baseline - CGFloat(env[index]) * peak
             ctx.fill(
@@ -373,6 +380,14 @@ struct VoicePrintView: View {
     .accessibilityLabel(
       "Voice print of \(book.title): \(book.currentChapter - 1) of \(book.chapterCount) chapters heard"
     )
+  }
+
+  /// The chapter's heights, and whether they come from its audio (or the demo) rather than a
+  /// placeholder for a chapter not read yet.
+  private func ridge(_ chapter: Int, samples: Int) -> (heights: [Double], isRead: Bool) {
+    guard let ridges else { return (envelope(chapter: chapter, samples: samples), true) }
+    if ridges.indices.contains(chapter), let ridge = ridges[chapter], ridge.count == samples { return (ridge, true) }
+    return (Array(repeating: 0, count: samples), false)
   }
 
   /// Speech-shaped loudness: a quiet opening, phrases separated by pauses, louder scenes.

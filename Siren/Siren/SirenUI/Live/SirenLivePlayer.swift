@@ -14,12 +14,22 @@ struct SirenLivePlayer: View {
   @AppStorage(SirenSettings.trimSilenceSaved) private var trimSaved = 0.0
   @State private var art: PlayerArt = .cover
   @State private var showingSend = false
+  /// The book's files and chapters, when it's downloaded and the voice print is chosen.
+  @State private var voiceSource: SirenVoicePrint.Source?
   @ObservedObject private var authentication = Audiobookshelf.shared.authentication
 
   var body: some View {
-    SirenPlayerView(book: SirenBook(player: model), playback: playback, pages: pages, flags: flags, art: $art) {
+    SirenPlayerView(
+      book: SirenBook(player: model),
+      playback: playback,
+      pages: pages,
+      flags: flags,
+      voiceRidges: voiceRidges,
+      art: $art
+    ) {
       moreMenu
     }
+    .task(id: VoiceKey(bookID: model.id, art: playerArt, download: model.downloadState)) { await loadVoicePrint() }
     .onAppear {
       art = pages.last ?? .cover
       model.onAppear()
@@ -37,9 +47,39 @@ struct SirenLivePlayer: View {
     }
   }
 
-  /// With Map chosen the player opens on the map, and the cover is a swipe away.
+  /// With Map or Voice print chosen the player opens on it, and the cover is a swipe away. The voice
+  /// print needs the book downloaded.
   private var pages: [PlayerArt] {
-    playerArt == .map ? [.cover, .map] : [.cover]
+    switch playerArt {
+    case .cover: [.cover]
+    case .map: [.cover, .map]
+    case .voice: voiceSource == nil ? [.cover] : [.cover, .voice]
+    }
+  }
+
+  private struct VoiceKey: Equatable {
+    let bookID: String
+    let art: PlayerArt
+    let download: DownloadManager.DownloadState
+  }
+
+  private var voiceRidges: [[Double]?]? {
+    guard let voiceSource else { return nil }
+    _ = SirenAudioScan.shared.revision
+    return SirenVoicePrint.ridges(voiceSource, samples: VoicePrintView.samples)
+  }
+
+  /// Finds the book's files and reads them, from the one playing now.
+  private func loadVoicePrint() async {
+    let source = playerArt == .voice ? SirenVoicePrint.source(bookID: model.id) : nil
+    let opening = voiceSource == nil && source != nil
+    voiceSource = source
+    if opening { art = .voice }
+    guard let source else { return }
+    let now = model.playbackProgress.totalProgress * model.playbackProgress.total
+    let current = source.files.lastIndex { $0.start <= now } ?? 0
+    let files = source.files[current...] + source.files[..<current]
+    await SirenAudioScan.shared.scanAll(files.map(\.url))
   }
 
   /// Bookmarks as fractions of the book, for the map's flags.

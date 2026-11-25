@@ -1,9 +1,10 @@
 import AVFoundation
+import Observation
 
 /// What's in a downloaded audio file: its pauses (for trim silence) and its loudness (for the voice
 /// print), read with `AVAssetReader` a chunk at a time, starting where you're listening.
 /// Kept in Caches, by file name and size.
-@MainActor
+@MainActor @Observable
 final class SirenAudioScan {
   static let shared = SirenAudioScan()
 
@@ -14,14 +15,23 @@ final class SirenAudioScan {
     var pauses: [Range<Double>] = []
     /// Loudness every `bin` seconds, in dBFS; nil where not read yet.
     var loudness: [Float?] = []
+    /// How many chunks the file has, once its length is known.
+    var chunkCount: Int?
+
+    var isComplete: Bool { chunkCount.map { chunks.count >= $0 } ?? false }
   }
 
   nonisolated static let chunk = 120.0
   nonisolated static let bin = 2.0
 
-  private var scans: [String: FileScan] = [:]
-  private var running: Set<String> = []
-  private let folder = URL.cachesDirectory.appending(path: "siren-scan", directoryHint: .isDirectory)
+  /// Goes up as chunks are read, so the voice print redraws.
+  private(set) var revision = 0
+  @ObservationIgnored private var scans: [String: FileScan] = [:]
+  @ObservationIgnored private var running: Set<String> = []
+  @ObservationIgnored private let folder = URL.cachesDirectory.appending(
+    path: "siren-scan",
+    directoryHint: .isDirectory
+  )
 
   /// The pause around `time` in the file, if that part has been read.
   func pause(in file: URL, at time: Double) -> Range<Double>? {
@@ -36,28 +46,43 @@ final class SirenAudioScan {
     return low < pauses.count && pauses[low].contains(time) ? pauses[low] : nil
   }
 
+  /// The file's loudness every `bin` seconds so far (nil where not read yet).
+  func loudness(in file: URL) -> [Float?]? {
+    Self.key(file).flatMap { scan($0)?.loudness }
+  }
+
   /// Reads the file from the chunk at `time` to the end, then the start, unless it's read or
   /// being read.
   func scan(_ file: URL, from time: Double) {
-    guard let key = Self.key(file), !running.contains(key) else { return }
-    let done = scan(key)?.chunks ?? []
-    let asset = AVURLAsset(url: file)
+    guard let key = Self.key(file), !running.contains(key), scan(key)?.isComplete != true else { return }
+    Task { await run(file, key: key, from: time) }
+  }
+
+  /// Reads each file in turn, all of it, skipping ones read or being read.
+  func scanAll(_ files: [URL]) async {
+    for file in files {
+      guard !Task.isCancelled else { return }
+      guard let key = Self.key(file), !running.contains(key), scan(key)?.isComplete != true else { continue }
+      await run(file, key: key, from: 0)
+    }
+  }
+
+  private func run(_ file: URL, key: String, from time: Double) async {
+    guard !running.contains(key) else { return }
     running.insert(key)
-    Task {
-      defer { running.remove(key) }
-      guard let duration = try? await asset.load(.duration).seconds, duration.isFinite, duration > 0 else { return }
-      let count = Int((duration / Self.chunk).rounded(.up))
-      let first = min(max(Int(time / Self.chunk), 0), count - 1)
-      let order = Array(first..<count) + Array(0..<first)
-      for index in order where !done.contains(index) {
-        let start = Double(index) * Self.chunk
-        let range = start..<min(start + Self.chunk, duration)
-        guard let read = await Task.detached(priority: .utility, operation: { await Self.read(asset, range) }).value
-        else {
-          return
-        }
-        merge(read, chunk: index, into: key, duration: duration)
-      }
+    defer { running.remove(key) }
+    let asset = AVURLAsset(url: file)
+    guard let duration = try? await asset.load(.duration).seconds, duration.isFinite, duration > 0 else { return }
+    let count = Int((duration / Self.chunk).rounded(.up))
+    let done = scan(key)?.chunks ?? []
+    let first = min(max(Int(time / Self.chunk), 0), count - 1)
+    for index in Array(first..<count) + Array(0..<first) where !done.contains(index) {
+      guard !Task.isCancelled else { return }
+      let start = Double(index) * Self.chunk
+      let range = start..<min(start + Self.chunk, duration)
+      guard let read = await Task.detached(priority: .utility, operation: { await Self.read(asset, range) }).value
+      else { return }
+      merge(read, chunk: index, of: count, into: key, duration: duration)
     }
   }
 
@@ -133,9 +158,10 @@ final class SirenAudioScan {
 
   // MARK: Storage
 
-  private func merge(_ read: Read, chunk: Int, into key: String, duration: Double) {
+  private func merge(_ read: Read, chunk: Int, of count: Int, into key: String, duration: Double) {
     var scan = scan(key) ?? FileScan()
     scan.chunks.insert(chunk)
+    scan.chunkCount = count
     // A pause cut by a chunk edge joins its other half.
     var pauses = scan.pauses + read.pauses
     pauses.sort { $0.lowerBound < $1.lowerBound }
@@ -154,6 +180,7 @@ final class SirenAudioScan {
       scan.loudness[bin] = level
     }
     scans[key] = scan
+    revision += 1
     let file = folder.appending(path: key + ".json")
     let folder = folder
     if let data = try? JSONEncoder().encode(scan) {

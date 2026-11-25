@@ -39,11 +39,14 @@ struct SirenProgressArtSettingsView: View {
       } header: {
         Text("Player")
       } footer: {
-        Text(
-          playerArt == .map
-            ? "The full player opens on the map; swipe the art for the cover."
-            : "What the full player shows above the controls."
-        )
+        switch playerArt {
+        case .cover: Text("What the full player shows above the controls.")
+        case .map: Text("The full player opens on the map; swipe the art for the cover.")
+        case .voice:
+          Text(
+            "The full player opens on the voice print, drawn from the book's audio, for downloaded books. Streamed books show the cover."
+          )
+        }
       }
 
       Section("Yearly goal") {
@@ -146,10 +149,7 @@ struct SirenProgressArtSettingsView: View {
       .shadow(color: .black.opacity(0.18), radius: 4, y: 2)
   }
 
-  /// Voice print needs the loudness scan from trim silence (Phase 4); the demo still shows it.
-  private var playerChoices: [PlayerArt] {
-    SirenDemoScreen.requested == nil ? [.cover, .map] : PlayerArt.allCases
-  }
+  private var playerChoices: [PlayerArt] { PlayerArt.allCases }
 
   private var goalValue: Binding<Int> {
     goalUnit == .books ? $bookGoal : $hourGoal
