@@ -13,6 +13,7 @@ struct SirenLiveRoot: View {
   @State private var router = SirenRouter.shared
   @State private var carMode = SirenCarMode.shared
   @State private var profiles = SirenProfiles.shared
+  @State private var endOfBook = SirenEndOfBook.shared
   @State private var showingOnboarding = false
   @State private var showingServerList = false
   @State private var didCheckStartup = false
@@ -23,6 +24,12 @@ struct SirenLiveRoot: View {
       // A profile switch rebuilds every screen on the new person's data.
       .id(profiles.activeID)
       .tint(SirenTheme.tint)
+      .sheet(item: $endOfBook.card) { card in
+        SirenEndOfBookSheet(card: card)
+          .presentationDetents([.height(224)])
+          .presentationDragIndicator(.visible)
+      }
+      .onChange(of: profiles.activeID) { _, _ in endOfBook.card = nil }
       .sheet(isPresented: playerBinding(assisted: false)) {
         if let current = playerManager.current {
           SirenLivePlayer(model: current) { router.openBook($0) }

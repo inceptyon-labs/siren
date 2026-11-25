@@ -8,12 +8,17 @@ struct SirenLiveBookDetail: View {
   @StateObject private var model: BookDetailsView.Model
   @ObservedObject private var playerManager = PlayerManager.shared
 
-  @State private var seriesModel: LibraryPage.Model?
+  /// The library's books in this book's series, with their positions.
+  @State private var ownedSeries: [(book: SirenBook, sequence: String?)] = []
   @State private var collectionSelector: CollectionMode?
   @State private var showingSend = false
   /// Nil until the "Liked" playlist has loaded.
   @State private var isLiked: Bool?
   @State private var isSavingLike = false
+  /// Audible's list of the series, with the books the library doesn't have.
+  @State private var audibleSeries: AudibleSeriesList?
+  @State private var requesting: AudibleSeriesList.Book?
+  @State private var profiles = SirenProfiles.shared
   @ObservedObject private var authentication = Audiobookshelf.shared.authentication
 
   private let coverSide: CGFloat = 220
@@ -27,10 +32,14 @@ struct SirenLiveBookDetail: View {
     ScrollView {
       VStack(spacing: 28) {
         hero
+        if let next = nextInSeries, let name = model.series.first?.name {
+          SirenNextInSeriesCard(seriesName: name, next: next, canRequest: !profiles.isKidsActive) { requesting = $0 }
+            .padding(.horizontal, 20)
+        }
         if authentication.isSirenAdmin, let tags = model.tags, !HouseholdSend.recipients(in: tags).isEmpty {
           SirenSentProgress(itemID: model.bookID, tags: tags)
         }
-        if !seriesBooks.isEmpty {
+        if !seriesEntries.isEmpty {
           seriesSection
         }
         if let about {
@@ -70,11 +79,28 @@ struct SirenLiveBookDetail: View {
       }
     }
     .onAppear(perform: model.onAppear)
-    .task(id: model.series.first?.id) { loadSeries() }
+    .task(id: model.series.first?.id) {
+      guard let series = model.series.first else {
+        ownedSeries = []
+        return
+      }
+      ownedSeries = await SirenSeriesResolver.owned(seriesID: series.id, name: series.name, libraryID: model.libraryID)
+    }
     .task(id: model.bookID) { isLiked = (try? await Likes.likedIDs())?.contains(model.bookID) }
     .task(id: model.asin) {
       if let asin = model.asin { await AudibleRatings.shared.load([asin]) }
     }
+    .task(id: SeriesLookup(asin: model.asin, name: model.series.first?.name)) {
+      guard let asin = model.asin, let name = model.series.first?.name else {
+        audibleSeries = nil
+        return
+      }
+      audibleSeries = await AudibleSeries.shared.series(ofBook: asin, named: name)
+    }
+    .sirenRequestDialog(
+      for: Binding(get: { requesting?.product }, set: { if $0 == nil { requesting = nil } }),
+      releaseDate: requesting?.isUpcoming == true ? requesting?.releaseDate : nil
+    ) { SirenRouter.shared.push(SirenRoute.requests) }
     .fullScreenCover(item: $model.ebookReader) { reader in
       NavigationStack {
         EbookReaderView(model: reader)
@@ -282,21 +308,20 @@ struct SirenLiveBookDetail: View {
 
   // MARK: Series
 
-  private func loadSeries() {
-    guard let series = model.series.first else { return }
-    let library = LibraryPageModel(
-      destination: .series(id: series.id, name: series.name, libraryID: model.libraryID)
-    )
-    library.onAppear()
-    seriesModel = library
+  private struct SeriesLookup: Hashable {
+    let asin: String?
+    let name: String?
   }
 
-  private var seriesBooks: [SirenBook] {
-    guard let seriesModel else { return [] }
-    return seriesModel.items.compactMap { item in
-      if case .book(let card) = item { return SirenBook(card: card) }
-      return nil
-    }
+  /// The library's books in the series, merged with Audible's list once it's in.
+  private var seriesEntries: [SirenSeriesEntry] {
+    SirenSeriesEntry.merge(owned: ownedSeries, audible: audibleSeries)
+  }
+
+  /// Once this book is finished: the next one in the series you haven't finished, owned or not.
+  private var nextInSeries: SirenSeriesEntry? {
+    guard model.progress.audio >= 1 else { return nil }
+    return SirenSeriesResolver.next(after: model.bookID, in: seriesEntries)
   }
 
   private var seriesSection: some View {
@@ -305,8 +330,11 @@ struct SirenLiveBookDetail: View {
         .padding(.horizontal, 20)
       ScrollView(.horizontal) {
         HStack(alignment: .top, spacing: 14) {
-          ForEach(seriesBooks) { item in
-            seriesItem(item)
+          ForEach(seriesEntries) { entry in
+            switch entry {
+            case .owned(let item): seriesItem(item)
+            case .audible(let member): audibleSeriesItem(member)
+            }
           }
         }
         .scrollTargetLayout()
@@ -333,6 +361,32 @@ struct SirenLiveBookDetail: View {
         .monospacedDigit()
     }
     .frame(width: seriesCoverSide, alignment: .leading)
+  }
+
+  /// A book in the series the library doesn't have: tap to request it.
+  private func audibleSeriesItem(_ member: AudibleSeriesList.Book) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Button {
+        requesting = member
+      } label: {
+        seriesTile(SirenBook(audible: member.product))
+      }
+      .buttonStyle(.plain)
+      // Requests are off in a kids profile.
+      .allowsHitTesting(!profiles.isKidsActive)
+      .accessibilityLabel("\(member.product.title), book \(member.sequence), not in your library")
+      Text(audibleStatus(member))
+        .font(.caption)
+        .foregroundStyle(SirenTheme.secondary)
+    }
+    .frame(width: seriesCoverSide, alignment: .leading)
+  }
+
+  private func audibleStatus(_ member: AudibleSeriesList.Book) -> String {
+    if let request = SirenRequests.shared.liveRequest(asin: member.product.asin) {
+      return request.status.label(progress: request.progress, releaseDate: request.releaseDate)
+    }
+    return member.outLabel ?? String(localized: "Not in library")
   }
 
   private func seriesTile(_ item: SirenBook) -> some View {

@@ -75,6 +75,7 @@ struct SirenLiveHome: View {
         // Requests are off in a kids profile, and these are all books to request.
         if !profiles.isKidsActive {
           SirenBecauseYouLikedShelf { router.homePath.append(SirenRoute.requests) }
+          SirenComingSoonShelf { router.homePath.append(SirenRoute.requests) }
         }
         SirenHighlyRatedShelf { open($0.id) }
 

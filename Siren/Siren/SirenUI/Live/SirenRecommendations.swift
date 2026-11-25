@@ -8,6 +8,7 @@ import SwiftUI
 ///   by how many of those point at the same book × its rating × log(how many rated it), leaving
 ///   out what's already in the library or requested.
 /// - Highly rated in your library: books you have but haven't started, rated 4.5 or more.
+/// - Coming soon: books not out yet in series you've been listening to.
 @MainActor @Observable
 final class SirenRecommendations {
   static let shared = SirenRecommendations()
@@ -16,6 +17,13 @@ final class SirenRecommendations {
   private(set) var seedTitle: String?
   private(set) var picks: [AudibleProduct] = []
   private(set) var unstarted: [SirenBook] = []
+  private(set) var upcoming: [Upcoming] = []
+
+  struct Upcoming: Identifiable {
+    let series: String
+    let book: AudibleSeriesList.Book
+    var id: String { book.id }
+  }
 
   private struct Key: Equatable {
     let serverID: String?
@@ -31,6 +39,8 @@ final class SirenRecommendations {
   /// Seeds asked about: Audible gets one request per seed, so this bounds a first load.
   private static let seedLimit = 10
   private static let shelfSize = 12
+  /// Series asked about for Coming Soon, the ones listened to most recently.
+  private static let seriesLimit = 8
 
   private init() {}
 
@@ -73,6 +83,7 @@ final class SirenRecommendations {
     seedTitle = nil
     picks = []
     unstarted = []
+    upcoming = []
   }
 
   private func load(_ key: Key) async {
@@ -88,6 +99,7 @@ final class SirenRecommendations {
 
     await loadPicks(library: library, progress: progress, liked: liked, key: key)
     await loadUnstarted(library: library, progress: progress, key: key)
+    await loadUpcoming(library: library, progress: progress, key: key)
     guard Self.currentKey == key else { return }
     loadedKey = key
     loadedAt = Date()
@@ -128,14 +140,11 @@ final class SirenRecommendations {
     }
 
     let ownedASINs = Set(library.compactMap(\.media.metadata.asin))
-    let ownedTitles = Set(library.map { Self.normalized($0.title) })
+    let ownedTitles = Set(library.map { SirenText.matchKey($0.title) })
     // Failed and cancelled requests can be made again, so those books stay in.
-    let requested = Set(
-      SirenRequests.shared.requests.filter { !$0.status.canRequestAgain }.compactMap(\.audiobook.audibleAsin)
-    )
     func isNew(_ product: AudibleProduct) -> Bool {
-      !ownedASINs.contains(product.asin) && !requested.contains(product.asin)
-        && !ownedTitles.contains(Self.normalized(product.title))
+      !ownedASINs.contains(product.asin) && SirenRequests.shared.liveRequest(asin: product.asin) == nil
+        && !ownedTitles.contains(SirenText.matchKey(product.title))
     }
 
     // How many seeds point at each book.
@@ -167,12 +176,6 @@ final class SirenRecommendations {
     shownKey = key
   }
 
-  /// Lowercased letters and digits only, so "The Way of Kings" matches "Way of Kings, The".
-  private static func normalized(_ title: String) -> String {
-    let words = title.lowercased().split { !$0.isLetter && !$0.isNumber }.filter { $0 != "the" && $0 != "a" }
-    return words.joined(separator: " ")
-  }
-
   // MARK: Highly rated in your library
 
   private func loadUnstarted(library: [Book], progress: [User.MediaProgress], key: Key) async {
@@ -190,6 +193,50 @@ final class SirenRecommendations {
     }
     shownKey = key
     unstarted = rated.sorted { $0.score > $1.score }.prefix(Self.shelfSize).map(\.book)
+  }
+
+  // MARK: Coming soon
+
+  private func loadUpcoming(library: [Book], progress: [User.MediaProgress], key: Key) async {
+    let byID = Dictionary(library.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    // One book per series, from the series listened to most recently.
+    var seen = Set<String>()
+    var anchors: [(asin: String, series: String)] = []
+    for item in progress.sorted(by: { $0.lastUpdate > $1.lastUpdate }) {
+      guard let book = byID[item.libraryItemId], let asin = book.media.metadata.asin, !asin.isEmpty,
+        let series = Self.firstSeries(book.media.metadata.seriesName),
+        seen.insert(SirenText.matchKey(series)).inserted
+      else { continue }
+      anchors.append((asin, series))
+      if anchors.count == Self.seriesLimit { break }
+    }
+
+    let ownedASINs = Set(library.compactMap(\.media.metadata.asin))
+    let ownedTitles = Set(library.map { SirenText.matchKey($0.title) })
+    var found: [String: Upcoming] = [:]
+    for anchor in anchors {
+      guard let list = await AudibleSeries.shared.series(ofBook: anchor.asin, named: anchor.series) else { continue }
+      guard Self.currentKey == key else { return }
+      for member in list.books where member.isUpcoming {
+        guard !ownedASINs.contains(member.product.asin),
+          !ownedTitles.contains(SirenText.matchKey(member.product.title))
+        else { continue }
+        found[member.id] = Upcoming(series: anchor.series, book: member)
+      }
+    }
+    shownKey = key
+    upcoming = found.values
+      .sorted { ($0.book.releaseDate ?? .distantFuture) < ($1.book.releaseDate ?? .distantFuture) }
+      .prefix(Self.shelfSize)
+      .map { $0 }
+  }
+
+  /// The first series in Audiobookshelf's "Name #1, Other #2", without its number.
+  private static func firstSeries(_ seriesName: String?) -> String? {
+    guard let seriesName else { return nil }
+    let name = (seriesName.components(separatedBy: " #").first ?? seriesName)
+      .trimmingCharacters(in: .whitespaces)
+    return name.isEmpty ? nil : name
   }
 }
 
@@ -210,7 +257,10 @@ struct SirenBecauseYouLikedShelf: View {
               Button {
                 selected = product
               } label: {
-                SirenRatedCard(book: book(product), caption: isRequested(product) ? "Requested" : nil)
+                SirenRatedCard(
+                  book: SirenBook(audible: product),
+                  caption: requests.liveRequest(asin: product.asin) != nil ? "Requested" : nil
+                )
               }
               .buttonStyle(.plain)
             }
@@ -219,65 +269,49 @@ struct SirenBecauseYouLikedShelf: View {
         .scrollClipDisabled()
       }
     }
-    .confirmationDialog(
-      selected?.title ?? "",
-      isPresented: Binding(get: { selected != nil }, set: { if !$0 { selected = nil } }),
-      titleVisibility: .visible,
-      presenting: selected
-    ) { product in
-      if isRequested(product) {
-        // Nothing to do; the dialog just says so.
-      } else if requests.isConnected {
-        Button("Request") { request(product) }
-      } else {
-        Button("Connect ReadMeABook", action: onConnect)
-      }
-    } message: { product in
-      Text(message(product))
-    }
+    .sirenRequestDialog(for: $selected, onConnect: onConnect)
   }
+}
 
-  private func book(_ product: AudibleProduct) -> SirenBook {
-    var book = SirenBook(id: product.asin, title: product.title, author: product.author, coverURL: product.coverURL)
-    book.apply(product.rating)
-    book.inLibrary = false
-    return book
-  }
+/// Home's shelf of books not out yet in series you've been listening to. Requesting one now
+/// has ReadMeABook fetch it on release day.
+struct SirenComingSoonShelf: View {
+  var onConnect: () -> Void
+  @State private var recommendations = SirenRecommendations.shared
+  @State private var requests = SirenRequests.shared
+  @State private var selected: AudibleSeriesList.Book?
 
-  private func isRequested(_ product: AudibleProduct) -> Bool {
-    requests.requests.contains { $0.audiobook.audibleAsin == product.asin && !$0.status.canRequestAgain }
-  }
-
-  private func message(_ product: AudibleProduct) -> String {
-    var parts = [product.author]
-    if let rating = product.rating {
-      parts.append(
-        String(
-          localized:
-            "Rated \(rating.average.formatted(.number.precision(.fractionLength(1)))) on Audible by \(rating.count.formatted()) listeners"
-        )
-      )
-    }
-    if isRequested(product) {
-      parts.append(String(localized: "Already requested."))
-    } else if !requests.isConnected {
-      parts.append(String(localized: "Connect ReadMeABook to request books you don't have."))
-    }
-    return parts.filter { !$0.isEmpty }.joined(separator: "\n")
-  }
-
-  private func request(_ product: AudibleProduct) {
-    Task {
-      do {
-        try await requests.request(product)
-        Toast(success: "Requested \(product.title)").show()
-      } catch let failure as ReadMeABook.Failure where failure.status == 409 {
-        Toast(message: failure.localizedDescription).show()
-        await requests.refresh()
-      } catch {
-        Toast(error: error.localizedDescription).show()
+  var body: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      if !recommendations.upcoming.isEmpty {
+        SirenSectionHeader(title: "Coming Soon in Your Series")
+        ScrollView(.horizontal, showsIndicators: false) {
+          LazyHStack(alignment: .top, spacing: 14) {
+            ForEach(recommendations.upcoming) { upcoming in
+              Button {
+                selected = upcoming.book
+              } label: {
+                SirenRatedCard(book: SirenBook(audible: upcoming.book.product), caption: caption(upcoming.book))
+              }
+              .buttonStyle(.plain)
+              .accessibilityHint(Text(upcoming.series))
+            }
+          }
+        }
+        .scrollClipDisabled()
       }
     }
+    .sirenRequestDialog(
+      for: Binding(get: { selected?.product }, set: { if $0 == nil { selected = nil } }),
+      releaseDate: selected?.releaseDate,
+      onConnect: onConnect
+    )
+  }
+
+  private func caption(_ book: AudibleSeriesList.Book) -> String? {
+    let out = book.outLabel
+    guard requests.liveRequest(asin: book.product.asin) != nil else { return out }
+    return out.map { String(localized: "Requested · \($0)") } ?? String(localized: "Requested")
   }
 }
 

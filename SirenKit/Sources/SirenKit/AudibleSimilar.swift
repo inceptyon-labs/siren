@@ -1,21 +1,5 @@
 import Foundation
 
-/// A book in Audible's catalog.
-public struct AudibleProduct: Codable, Sendable, Hashable, Identifiable {
-  public let asin: String
-  public let title: String
-  public let authors: [String]
-  public let narrators: [String]
-  public let coverURL: URL?
-  public let rating: AudibleRatings.Rating?
-  /// `yyyy-MM-dd`.
-  public let releaseDate: String?
-
-  public var id: String { asin }
-  public var author: String { authors.joined(separator: ", ") }
-  public var narrator: String { narrators.joined(separator: ", ") }
-}
-
 /// Books Audible lists as similar to a book ("listeners also enjoyed"), by ASIN. Cached on the
 /// device for 14 days.
 @MainActor
@@ -50,7 +34,7 @@ public final class AudibleSimilar {
         "catalog/products/\(asin)/sims",
         query: [
           URLQueryItem(name: "num_results", value: "20"),
-          URLQueryItem(name: "response_groups", value: "product_desc,contributors,media,rating,product_attrs"),
+          URLQueryItem(name: "response_groups", value: AudibleProducts.responseGroups),
         ]
       ),
       let response = try? AudibleCatalog.decoder().decode(Response.self, from: data)
@@ -62,33 +46,7 @@ public final class AudibleSimilar {
   }
 
   private struct Response: Decodable {
-    let similarProducts: [Raw]
-  }
-
-  private struct Raw: Decodable {
-    struct Person: Decodable { let name: String }
-
-    let asin: String
-    let title: String?
-    let authors: [Person]?
-    let narrators: [Person]?
-    let productImages: [String: String]?
-    let rating: AudibleCatalog.RawRatings?
-    let releaseDate: String?
-
-    var product: AudibleProduct? {
-      guard let title else { return nil }
-      return AudibleProduct(
-        asin: asin,
-        title: title,
-        // Translators and the like come as "Name — Translator".
-        authors: authors?.map(\.name).filter { !$0.contains("—") } ?? [],
-        narrators: narrators?.map(\.name) ?? [],
-        coverURL: productImages?["500"].flatMap(URL.init(string:)),
-        rating: rating?.rating,
-        releaseDate: releaseDate
-      )
-    }
+    let similarProducts: [AudibleProducts.Raw]
   }
 
   private func scheduleSave() {

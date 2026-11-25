@@ -597,6 +597,8 @@ extension PlayerManager {
           currentPodcastID: currentPodcastID
         )
       else {
+        // SIREN: offer the next book in the series
+        if !isManual, currentPodcastID == nil { SirenEndOfBook.shared.bookFinished(currentID) }
         clearCurrent()
         return
       }
