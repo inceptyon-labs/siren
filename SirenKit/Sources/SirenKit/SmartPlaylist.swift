@@ -163,17 +163,15 @@ extension SmartPlaylist.Rule {
     case .tag(let name):
       return (book.tags ?? []).contains { $0.caseInsensitiveCompare(name) == .orderedSame }
     case .author(let name):
-      return Self.names(metadata.authorName).contains { $0.caseInsensitiveCompare(name) == .orderedSame }
+      return Self.listed(name, in: metadata.authorName)
     case .narrator(let name):
-      return Self.names(metadata.narratorName).contains { $0.caseInsensitiveCompare(name) == .orderedSame }
+      return Self.listed(name, in: metadata.narratorName)
     case .series(let name):
-      // "Name #1, Other #2", searched rather than split (a series name can contain ", "), and
-      // only where an entry starts, so "Dune" isn't "Children of Dune".
+      // "Name #1, Other #2": the name followed by its number, or by nothing.
       let joined = (metadata.seriesName ?? "").lowercased()
       let name = name.lowercased()
       guard !name.isEmpty else { return false }
-      return [name + " #", name + ", "].contains { joined.hasPrefix($0) || joined.contains(", " + $0) }
-        || joined == name || joined.hasSuffix(", " + name)
+      return joined.hasPrefix(name + " #") || joined.contains(", " + name + " #") || Self.listed(name, in: joined)
     case .progress(let state):
       let progress = context.progress[book.id]
       switch state {
@@ -197,8 +195,14 @@ extension SmartPlaylist.Rule {
     }
   }
 
-  static func names(_ joined: String?) -> [String] {
-    (joined ?? "").components(separatedBy: ", ").map { $0.trimmingCharacters(in: .whitespaces) }
-      .filter { !$0.isEmpty }
+  /// Whether `name` is a whole entry in Audiobookshelf's ", "-joined list. Searched rather than
+  /// split, since a name can hold ", " itself ("Doe, John"), and only at entry boundaries, so
+  /// "Dune" isn't "Children of Dune".
+  static func listed(_ name: String, in joined: String?) -> Bool {
+    let joined = (joined ?? "").lowercased()
+    let name = name.trimmingCharacters(in: .whitespaces).lowercased()
+    guard !name.isEmpty else { return false }
+    return joined == name || joined.hasPrefix(name + ", ") || joined.hasSuffix(", " + name)
+      || joined.contains(", " + name + ", ")
   }
 }

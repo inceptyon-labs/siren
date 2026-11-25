@@ -132,14 +132,22 @@ public final class SmartPlaylists {
     return Audiobookshelf.shared.authentication.server?.storage.string(forKey: key)
   }
 
-  /// Marks the Audiobookshelf playlists Siren keeps, so another device can find one by name
-  /// without taking over a playlist someone made by hand.
-  private static let marker = "Smart playlist kept up to date by Siren."
+  /// Marks the Audiobookshelf playlist Siren keeps for one smart playlist, so another device finds
+  /// it without taking over a playlist someone made by hand or another smart playlist's copy.
+  private static func marker(_ id: UUID) -> String {
+    "Smart playlist kept up to date by Siren. [\(id.uuidString)]"
+  }
 
   /// Saves the playlist's current books to Audiobookshelf, creating the playlist there or updating
   /// it. Returns its ID.
   @discardableResult
   public func saveToServer(_ playlist: SmartPlaylist) async throws -> String {
+    let existing = serverPlaylistID(for: playlist, in: try await Audiobookshelf.shared.playlists.fetch().results)
+    return try await write(playlist, to: existing)
+  }
+
+  /// Puts the playlist's books in `existing`, or in a new playlist when nil.
+  private func write(_ playlist: SmartPlaylist, to existing: String?) async throws -> String {
     let server = Audiobookshelf.shared.authentication.server?.id
     let library = Audiobookshelf.shared.libraries.current?.id
     func checkUnchanged() throws {
@@ -151,19 +159,21 @@ public final class SmartPlaylists {
     let ids = try await books(for: playlist).map(\.id)
     // Audiobookshelf won't keep an empty playlist; the last copy stays rather than being cleared.
     guard !ids.isEmpty else { throw SaveError.empty }
-    let existing = try await serverPlaylistID(for: playlist)
     try checkUnchanged()
     let saved: Playlist
     if let existing {
       saved = try await Audiobookshelf.shared.playlists.update(
         playlistID: existing,
         name: playlist.name,
-        description: Self.marker,
+        description: Self.marker(playlist.id),
         items: ids
       )
     } else {
       let created = try await Audiobookshelf.shared.playlists.create(name: playlist.name, items: ids)
-      saved = try await Audiobookshelf.shared.playlists.update(playlistID: created.id, description: Self.marker)
+      saved = try await Audiobookshelf.shared.playlists.update(
+        playlistID: created.id,
+        description: Self.marker(playlist.id)
+      )
     }
     try checkUnchanged()
     if let key = savedKey(playlist.id) {
@@ -172,13 +182,11 @@ public final class SmartPlaylists {
     return saved.id
   }
 
-  /// The server playlist to update: the one saved before if it's still there, else Siren's with
-  /// the same name (saved from another device). Nil to make one. Throws when the server can't
-  /// say, rather than risk a duplicate.
-  private func serverPlaylistID(for playlist: SmartPlaylist) async throws -> String? {
-    let all = try await Audiobookshelf.shared.playlists.fetch().results
+  /// The server playlist kept for this one: the one saved here if it's still there, else the one
+  /// marked with its ID (saved from another device). Nil when there's none.
+  private func serverPlaylistID(for playlist: SmartPlaylist, in all: [Playlist]) -> String? {
     if let saved = savedPlaylistID(playlist.id), all.contains(where: { $0.id == saved }) { return saved }
-    return all.first { $0.name == playlist.name && $0.description == Self.marker }?.id
+    return all.first { $0.description == Self.marker(playlist.id) }?.id
   }
 
   /// Stops keeping the Audiobookshelf copy up to date (the playlist itself stays on the server).
@@ -195,18 +203,21 @@ public final class SmartPlaylists {
     }
   }
 
-  /// Brings the saved Audiobookshelf copies in this library up to date, at most once an hour.
-  /// A run that fails somewhere is tried again next time rather than an hour later.
+  /// Brings the Audiobookshelf copies in this library up to date, at most once an hour, including
+  /// ones saved from another device. A run that fails somewhere is tried again next time rather
+  /// than an hour later.
   public func syncSaved(force: Bool = false) async {
     guard !isSyncing, let library = Audiobookshelf.shared.libraries.current?.id else { return }
     if !force, let lastSync, lastSync.library == library, Date().timeIntervalSince(lastSync.at) < 3600 { return }
     isSyncing = true
     defer { isSyncing = false }
+    guard let onServer = try? await Audiobookshelf.shared.playlists.fetch().results else { return }
     var failed = false
-    for playlist in all where savedPlaylistID(playlist.id) != nil {
+    for playlist in all {
       guard Audiobookshelf.shared.libraries.current?.id == library else { return }
+      guard let existing = serverPlaylistID(for: playlist, in: onServer) else { continue }
       do {
-        try await saveToServer(playlist)
+        try await write(playlist, to: existing)
       } catch SaveError.empty {
         // Nothing matches right now; the server copy keeps its last books.
       } catch {
