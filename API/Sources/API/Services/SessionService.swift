@@ -8,11 +8,13 @@ public final class SessionService {
   public enum SessionType {
     case player
     case watch
+    case tv  // SIREN: the Apple TV app
 
     var deviceID: String {
       switch self {
       case .player: SessionService.deviceID
       case .watch: SessionService.deviceID + "-watch"
+      case .tv: SessionService.deviceID  // SIREN: the Apple TV app
       }
     }
 
@@ -20,6 +22,7 @@ public final class SessionService {
       switch self {
       case .player: "Siren iOS"  // SIREN: Siren name
       case .watch: "Siren Watch"  // SIREN: Siren name
+      case .tv: "Siren TV"  // SIREN: the Apple TV app
       }
     }
 
@@ -27,6 +30,7 @@ public final class SessionService {
       switch self {
       case .player: "ios"
       case .watch: "watchos"
+      case .tv: "tvos"  // SIREN: the Apple TV app
       }
     }
   }

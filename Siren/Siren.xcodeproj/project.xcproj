@@ -70,6 +70,11 @@
           "exclusions": [
             "Info.plist",
           ],
+        }, {
+          "target": "Siren TV",
+          "inclusions": [
+            "SirenUI/Design/SirenTheme.swift",
+          ],
         },
       ],
     }, {
@@ -125,6 +130,40 @@
         },
       ],
     },
+    {
+      "kind": "folder",
+      "path": "Siren TV",
+      "target-membership": [
+        "Siren TV",
+      ],
+      "membership-exceptions": [
+        {
+          "target": "Siren TV",
+          "exclusions": [
+            "Info.plist",
+          ],
+        },
+      ],
+    }, {
+      "kind": "folder",
+      "path": "SirenTopShelf",
+      "target-membership": [
+        "SirenTopShelf",
+      ],
+      "membership-exceptions": [
+        {
+          "target": "Siren TV",
+          "inclusions": [
+            "TopShelfSnapshot.swift",
+          ],
+        }, {
+          "target": "SirenTopShelf",
+          "exclusions": [
+            "Info.plist",
+          ],
+        },
+      ],
+    },
     { "path": "<PROJECT>/../CHANGELOG.md", "target-membership": [ "Siren/resources" ] },
     {
       "kind": "group",
@@ -136,6 +175,12 @@
           "target-membership": [
             "SirenWidgetExtension/frameworks",
             "SirenWatchWidgetExtension/frameworks",
+          ],
+        }, {
+          "path": "<SDK>/System/Library/Frameworks/TVServices.framework",
+          "target-membership": [
+            "Siren TV/frameworks",
+            "SirenTopShelf/frameworks",
           ],
         }, {
           "path": "<SDK>/System/Library/Frameworks/SwiftUI.framework",
@@ -161,6 +206,8 @@
         { "path": "<PRODUCTS>/Siren.app", "id": "3FC8DC6E2E638F5E00A4B080", "type": "wrapper.application", "index": false },
         { "path": "<PRODUCTS>/Siren Watch App.app", "id": "3FBEA0652E8CD49300976BA0", "type": "wrapper.application", "index": false, "target-membership": [ { "build-phase": "Siren/copy/Embed Watch Content", "platforms": [ "ios" ], "header-preservation": "remove-on-copy" } ] },
         { "path": "<PRODUCTS>/SirenWidgetExtension.appex", "id": "3F2D3BF32EBE711800D49AFF", "type": "wrapper.app-extension", "index": false, "target-membership": [ { "build-phase": "Siren/copy/Embed Foundation Extensions", "platforms": [ "ios" ], "header-preservation": "remove-on-copy" } ] },
+        { "path": "<PRODUCTS>/Siren TV.app", "id": "3F7A1C2E2FB3D10000A1B001", "type": "wrapper.application", "index": false },
+        { "path": "<PRODUCTS>/SirenTopShelf.appex", "id": "3F7A1C2E2FB3D10000A1B002", "type": "wrapper.app-extension", "index": false, "target-membership": [ { "build-phase": "Siren TV/copy/Embed Foundation Extensions", "header-preservation": "remove-on-copy" } ] },
         { "path": "<PRODUCTS>/SirenWatchWidgetExtension.appex", "id": "3F5A20502F6E656C00CFD89E", "type": "wrapper.app-extension", "index": false, "target-membership": [ { "build-phase": "Siren Watch App/copy/Embed Foundation Extensions", "header-preservation": "remove-on-copy" } ] },
       ],
     },
@@ -412,6 +459,64 @@
         "SKIP_INSTALL": "YES",
         "TARGETED_DEVICE_FAMILY": "4",
         "WATCHOS_DEPLOYMENT_TARGET": "10",
+      },
+    }, {
+      "name": "Siren TV",
+      "id": "3F7A1C2E2FB3D10000A1B003",
+      "product": "Products/Siren TV.app",
+      "product-type": "application",
+      "dependencies": [
+        "SirenTopShelf",
+      ],
+      "build-phases": [
+        "compile-sources",
+        "frameworks",
+        "resources",
+        {
+          "kind": "copy",
+          "name": "Embed Foundation Extensions",
+          "bundle-base-path": "plugins-directory",
+        },
+      ],
+      "package-product-members": [
+        {
+          "product-name": "API",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "product-name": "SirenKit",
+          "build-phase": { "build-phase": "frameworks" },
+        },
+      ],
+      "build-settings": {
+        "ASSETCATALOG_COMPILER_APPICON_NAME": "App Icon & Top Shelf Image",
+        "CODE_SIGN_ENTITLEMENTS": "Siren TV/Siren TV.entitlements",
+        "INFOPLIST_FILE": "Siren TV/Info.plist",
+        "INFOPLIST_KEY_CFBundleDisplayName": "Siren",
+        "PRODUCT_BUNDLE_IDENTIFIER": "$(ORG_IDENTIFIER).siren",
+        "SDKROOT": "appletvos",
+        "SWIFT_DEFAULT_ACTOR_ISOLATION": "MainActor",
+        "TARGETED_DEVICE_FAMILY": "3",
+        "TVOS_DEPLOYMENT_TARGET": "17.0",
+      },
+    }, {
+      "name": "SirenTopShelf",
+      "id": "3F7A1C2E2FB3D10000A1B004",
+      "product": "Products/SirenTopShelf.appex",
+      "product-type": "app-extension",
+      "build-phases": [
+        "compile-sources",
+        "frameworks",
+        "resources",
+      ],
+      "build-settings": {
+        "APPLICATION_EXTENSION_API_ONLY": "YES",
+        "CODE_SIGN_ENTITLEMENTS": "SirenTopShelf/SirenTopShelf.entitlements",
+        "INFOPLIST_FILE": "SirenTopShelf/Info.plist",
+        "PRODUCT_BUNDLE_IDENTIFIER": "$(ORG_IDENTIFIER).siren.topshelf",
+        "SDKROOT": "appletvos",
+        "SKIP_INSTALL": "YES",
+        "TARGETED_DEVICE_FAMILY": "3",
+        "TVOS_DEPLOYMENT_TARGET": "17.0",
       },
     },
   ],
