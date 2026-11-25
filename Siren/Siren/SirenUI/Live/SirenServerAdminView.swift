@@ -39,6 +39,7 @@ struct SirenServerAdminView: View {
       link("Users", systemImage: "person.2") { SirenServerAdminUsers() }
       link("Libraries", systemImage: "books.vertical") { SirenServerAdminLibraries() }
       link("Backups", systemImage: "externaldrive") { SirenServerAdminBackups() }
+      link("Chapter Names", systemImage: "list.number") { SirenServerAdminChapters() }
       // ReadMeABook keeps approvals behind its own admin sign-in; API tokens can't reach them.
       if let client = SirenRequests.shared.client, SirenRequests.shared.user?.isAdmin == true {
         Section {
