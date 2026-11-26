@@ -206,7 +206,7 @@ struct SirenServerAdminBackups: View {
       if self.draft == draft { self.draft = saved }
       error = nil
     } catch {
-      // A newer edit cancelled this save; that edit saves itself.
+      // A newer edit canceled this save; that edit saves itself.
       guard !Task.isCancelled, !(error is CancellationError), self.draft == draft else { return }
       self.draft = schedule
       self.error = "Couldn't save the schedule. \(error.localizedDescription)"

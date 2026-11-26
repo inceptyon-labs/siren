@@ -131,7 +131,7 @@ final class SirenRecommendations {
 
     let ownedASINs = Set(library.compactMap(\.media.metadata.asin))
     let ownedTitles = Set(library.map { SirenText.matchKey($0.title) })
-    // Failed and cancelled requests can be made again, so those books stay in.
+    // Failed and canceled requests can be made again, so those books stay in.
     func isNew(_ product: AudibleProduct) -> Bool {
       !ownedASINs.contains(product.asin) && SirenRequests.shared.liveRequest(asin: product.asin) == nil
         && !ownedTitles.contains(SirenText.matchKey(product.title))

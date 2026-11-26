@@ -2,7 +2,7 @@
 """Seeded fog-of-war maps (copy of fogmap/gen.py for the art-styles sample).
 
 Changes from the original: square 400x400 sheet (the player art area is square), fog drawn in the
-player's raised colour, and render(reserve=...) keeps boxes (the cover cartouche) clear of hills,
+player's raised color, and render(reserve=...) keeps boxes (the cover cartouche) clear of hills,
 trees, waves, labels and the compass rose.
 
 A book ID hashes (SHA-256) to a seed. The seed drives the terrain noise, coastline,

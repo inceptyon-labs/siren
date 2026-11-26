@@ -52,7 +52,7 @@ struct FogMapView<Cover: View>: View {
   }
 }
 
-/// Map colours from the prototype.
+/// Map colors from the prototype.
 enum FogInk {
   static let ink = Color(sirenHex: 0x2B2620)
   static let paper = Color(sirenHex: 0xE9E1CF)
@@ -130,7 +130,7 @@ extension Path {
 }
 
 extension GraphicsContext {
-  /// Text centred on `point.x` with its baseline on `point.y`, optionally with a paper halo.
+  /// Text centered on `point.x` with its baseline on `point.y`, optionally with a paper halo.
   fileprivate func draw(
     baseline point: CGPoint,
     color: Color,

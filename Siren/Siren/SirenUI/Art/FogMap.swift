@@ -160,7 +160,7 @@ nonisolated struct FogMap: Sendable {
   private static let numeralAdvances: [Character: Double] = ["I": 4.83, "V": 8.38, "X": 8.16, "L": 7.19, "C": 8.43]
 
   /// Ground a numeral keeps clear of hills and trees: its ink (cap height 7.05) plus the paper halo and a little air.
-  /// The text is centred on its whole advance, so the trailing tracking leaves the ink 0.6 left of the point.
+  /// The text is centered on its whole advance, so the trailing tracking leaves the ink 0.6 left of the point.
   static func keepOut(_ numeral: Numeral) -> CGRect {
     let advance = MapGrid.roman(numeral.chapter).reduce(0) { $0 + (numeralAdvances[$1] ?? 8.4) }
     let air = 2.7
@@ -288,7 +288,7 @@ nonisolated struct FogMapReveal: Sendable, Equatable {
   let flags: [CGPoint]
   /// Numerals of the charted chapters, moved off any flag.
   let numerals: [FogMap.Numeral]
-  /// Centre of the current chapter's lettering on the fog.
+  /// Center of the current chapter's lettering on the fog.
   let label: CGPoint?
 
   static func == (a: Self, b: Self) -> Bool { a.key == b.key }

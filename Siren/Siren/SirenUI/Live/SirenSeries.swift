@@ -63,7 +63,7 @@ extension SirenText {
 }
 
 extension SirenRequests {
-  /// Your live request for this book, if any. Failed and cancelled ones don't count: they can be
+  /// Your live request for this book, if any. Failed and canceled ones don't count: they can be
   /// made again.
   func liveRequest(asin: String) -> ReadMeABook.Request? {
     requests.first { $0.audiobook.audibleAsin == asin && !$0.status.canRequestAgain }

@@ -145,7 +145,7 @@ nonisolated struct MapNoise: Sendable {
     return x1n + v * (x2n - x1n)
   }
 
-  /// Octaves normalised to the first octave's range.
+  /// Octaves normalized to the first octave's range.
   func fbm(_ x: Double, _ y: Double, octaves: Int = 5) -> Double {
     var s = 0.0
     var a = 1.0
@@ -258,7 +258,7 @@ nonisolated enum MapGrid {
     }
   }
 
-  /// Boundaries between regions of a label grid, through edge midpoints and cell centres.
+  /// Boundaries between regions of a label grid, through edge midpoints and cell centers.
   static func borders(_ labels: [Int32], keep: (CGPoint, CGPoint) -> Bool) -> [[CGPoint]] {
     func mid(_ key: Int) -> CGPoint {
       let i = Double(key % nx)
@@ -285,8 +285,8 @@ nonisolated enum MapGrid {
         if act.count == 2 {
           segs.append((act[0], act[1]))
         } else {
-          let centre = node(2, i, j)
-          segs += act.map { ($0, centre) }
+          let center = node(2, i, j)
+          segs += act.map { ($0, center) }
         }
       }
     }

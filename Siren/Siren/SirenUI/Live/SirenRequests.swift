@@ -79,7 +79,7 @@ final class SirenRequests {
     guard let client else { return }
     do {
       try await client.cancel(request)
-      Toast(success: "Request cancelled").show()
+      Toast(success: "Request canceled").show()
     } catch {
       Toast(error: error.localizedDescription).show()
     }
@@ -115,7 +115,7 @@ extension ReadMeABook.Status {
     case .available: String(localized: "Ready")
     case .failed: String(localized: "Couldn't find it")
     case .declined: String(localized: "Declined")
-    case .cancelled: String(localized: "Cancelled")
+    case .cancelled: String(localized: "Canceled")
     case .other(let raw): raw
     }
   }
@@ -417,7 +417,7 @@ struct SirenRequestResultRow: View {
   }
 
   /// Where the book's request stands: yours if listed, else what the search reported. Failed and
-  /// cancelled ones can be requested again.
+  /// canceled ones can be requested again.
   private var currentStatus: ReadMeABook.Status? {
     if let myRequest { return myRequest.status }
     guard result.isRequested else { return nil }

@@ -54,7 +54,7 @@ final class SirenTrimSilence {
     self.timer = timer
   }
 
-  /// A seek of your own: no jump for a moment, so it isn't cancelled by one.
+  /// A seek of your own: no jump for a moment, so it isn't canceled by one.
   func hold() {
     heldUntil = Date(timeIntervalSinceNow: 1)
   }

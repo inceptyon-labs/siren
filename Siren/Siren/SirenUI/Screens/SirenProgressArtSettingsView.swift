@@ -21,7 +21,7 @@ struct SirenProgressArtSettingsView: View {
         }
         choiceRow(
           "Ink in as you listen",
-          detail: "The sketch fills with colour",
+          detail: "The sketch fills with color",
           isSelected: revealsProgress && !washesCovers
         ) {
           RevealCover(book: Demo.saltRoad, progress: 0.57, wash: false)
@@ -30,7 +30,7 @@ struct SirenProgressArtSettingsView: View {
           washesCovers = false
         }
         choiceRow(
-          "Ink in over a colour wash",
+          "Ink in over a color wash",
           detail: "The sketch keeps a hint of the cover",
           isSelected: revealsProgress && washesCovers
         ) {

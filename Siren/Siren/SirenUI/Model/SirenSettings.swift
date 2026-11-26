@@ -4,7 +4,7 @@ import Foundation
 enum SirenSettings {
   /// Covers sketch in and ink as you listen (every cover in the app).
   static let coverReveal = "siren.covers.reveal"
-  /// Sketches carry a faint wash of the cover's colours (with the reveal on).
+  /// Sketches carry a faint wash of the cover's colors (with the reveal on).
   static let coverWash = "siren.covers.wash"
   /// What the full player shows: a `PlayerArt` raw value.
   static let playerArt = "siren.player.art"

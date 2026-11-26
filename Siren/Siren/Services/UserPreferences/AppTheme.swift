@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 
 enum AppTheme: String, CaseIterable {
-  case siren  // SIREN: Siren's ground and row colours
+  case siren  // SIREN: Siren's ground and row colors
   case sepia
   case system
   case pure

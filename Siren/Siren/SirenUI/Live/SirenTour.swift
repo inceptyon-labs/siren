@@ -201,7 +201,7 @@ private struct SirenTourCovers: View {
     SirenTourPage(
       title: "Covers ink in as you listen",
       message:
-        "Every book starts as a pencil sketch and fills with colour as you go, so you can see how far you've got at a glance. Only you see your progress."
+        "Every book starts as a pencil sketch and fills with color as you go, so you can see how far you've got at a glance. Only you see your progress."
     ) {
       VStack(spacing: 14) {
         InkingCover(book: Demo.saltRoad, progress: progress)

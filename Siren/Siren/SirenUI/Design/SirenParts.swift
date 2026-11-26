@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// A household member's fixed furniture: same plate colour and initial everywhere.
+/// A household member's fixed furniture: same plate color and initial everywhere.
 struct HouseholdPlate: View {
   let member: DemoMember
   var size: CGFloat = 28

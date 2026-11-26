@@ -4,7 +4,7 @@ import Nuke
 import SwiftUI
 import UIKit
 
-// Demo covers are drawn in SwiftUI so the review build needs no server. In the app the colour image
+// Demo covers are drawn in SwiftUI so the review build needs no server. In the app the color image
 // comes from Audiobookshelf and the sketch is made from it by `SketchFilter`.
 
 enum CoverLayout: Hashable { case saltRoad, sunSea, mountains, tree, moonHills, tower, ship, waves }
@@ -97,7 +97,7 @@ struct CoverSpec: Hashable {
   }
 }
 
-/// The full-colour jacket, drawn on a 100 x 100 grid.
+/// The full-color jacket, drawn on a 100 x 100 grid.
 struct CoverArtwork: View {
   let spec: CoverSpec
 
@@ -281,7 +281,7 @@ struct CoverArtwork: View {
 
 /// Graphite pencil sketch of any cover image, made on the device with Core Image and Core Graphics.
 /// Every layer sits on opaque paper, so the sketch looks the same on light and dark screens. With
-/// `wash`, the paper carries a faint wash of the cover's own colours.
+/// `wash`, the paper carries a faint wash of the cover's own colors.
 enum SketchFilter {
   private static let context = CIContext(options: [.cacheIntermediates: false])
   static let paperColor = CIColor(red: 236 / 255, green: 234 / 255, blue: 228 / 255)
@@ -294,7 +294,7 @@ enum SketchFilter {
     let size = extent.size
     let mono = input.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0])
     let plainPaper = CIImage(color: paperColor).cropped(to: extent)
-    // The wash is hand-colouring under the pencil: the cover's hues, bled soft, at the paper's own
+    // The wash is hand-coloring under the pencil: the cover's hues, bled soft, at the paper's own
     // lightness. The drawing still carries the light and dark, so a dark jacket gets its hatching,
     // not a muddy copy of itself.
     let paper =
@@ -334,7 +334,7 @@ enum SketchFilter {
         parameters: [kCIInputBackgroundImageKey: shaded, kCIInputMaskImageKey: deepMask]
       )
 
-    // Outlines: one clean line per colour boundary.
+    // Outlines: one clean line per color boundary.
     let edges =
       input
       .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 0.6]).cropped(to: extent)
@@ -607,7 +607,7 @@ struct RevealCover: View {
   var cornerRadius: CGFloat = SirenTheme.coverRadius
   var shadow = true
   var resolution: CoverResolution = .small
-  /// A colour wash under the sketch; nil follows the setting.
+  /// A color wash under the sketch; nil follows the setting.
   var wash: Bool?
 
   @State private var loaded: (url: URL, wash: Bool, images: CoverImages)?

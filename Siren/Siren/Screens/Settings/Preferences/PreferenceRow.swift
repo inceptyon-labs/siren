@@ -33,7 +33,7 @@ struct PreferenceRow: View {
   }
 
   var body: some View {
-    // SIREN: neutral glyphs and Siren's row type in place of coloured tiles (`tint` is unused)
+    // SIREN: neutral glyphs and Siren's row type in place of colored tiles (`tint` is unused)
     HStack(spacing: 14) {
       Image(systemName: systemImage)
         .font(.body)
