@@ -422,6 +422,7 @@ final class CoverStore {
   private var drawn: [DrawnKey: CoverImages] = [:]
   private let remote = NSCache<NSString, Entry>()
   private var loading: [String: Task<CoverImages?, Never>] = [:]
+  private var tints: [String: TintEntry] = [:]
   private let sketches = SketchWorker()
 
   private struct DrawnKey: Hashable {
@@ -472,6 +473,92 @@ final class CoverStore {
       remote.setObject(Entry(result), forKey: key as NSString, cost: side * side * 8)
     }
     return result
+  }
+
+  /// A pale surface color from the cover's strongest color (a dark one in Dark Mode), or nil for a
+  /// cover with no real color in it.
+  func tint(for book: SirenBook) async -> UIColor? {
+    let key = book.coverURL?.absoluteString ?? "\(book.cover.hashValue)"
+    if let hit = tints[key] { return hit.color }
+    let image: UIImage? =
+      if let url = book.coverURL {
+        await Self.loadSquare(url, side: CoverResolution.small.rawValue)
+      } else {
+        images(for: book.cover).color
+      }
+    // A cover that didn't load is tried again next time; a gray one stays untinted.
+    guard let image else { return nil }
+    let color = Self.strongestColor(image).map(Self.surface)
+    tints[key] = TintEntry(color: color)
+    return color
+  }
+
+  private struct TintEntry { let color: UIColor? }
+
+  /// The average of the cover's most saturated, brightest pixels: its color, not its muddy average.
+  nonisolated private static func strongestColor(_ image: UIImage) -> (hue: CGFloat, saturation: CGFloat)? {
+    guard let cg = image.cgImage else { return nil }
+    let side = 16
+    var pixels = [UInt8](repeating: 0, count: side * side * 4)
+    guard
+      let context = CGContext(
+        data: &pixels,
+        width: side,
+        height: side,
+        bitsPerComponent: 8,
+        bytesPerRow: side * 4,
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+      )
+    else { return nil }
+    context.interpolationQuality = .medium
+    context.draw(cg, in: CGRect(x: 0, y: 0, width: side, height: side))
+    var samples: [(score: CGFloat, color: UIColor)] = []
+    for i in stride(from: 0, to: pixels.count, by: 4) {
+      let color = UIColor(
+        red: CGFloat(pixels[i]) / 255,
+        green: CGFloat(pixels[i + 1]) / 255,
+        blue: CGFloat(pixels[i + 2]) / 255,
+        alpha: 1
+      )
+      var hue: CGFloat = 0
+      var saturation: CGFloat = 0
+      var brightness: CGFloat = 0
+      color.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: nil)
+      samples.append((saturation * (0.3 + 0.7 * brightness), color))
+    }
+    let top = samples.sorted { $0.score > $1.score }.prefix(samples.count / 5)
+    var red: CGFloat = 0
+    var green: CGFloat = 0
+    var blue: CGFloat = 0
+    for sample in top {
+      var r: CGFloat = 0
+      var g: CGFloat = 0
+      var b: CGFloat = 0
+      sample.color.getRed(&r, green: &g, blue: &b, alpha: nil)
+      red += r
+      green += g
+      blue += b
+    }
+    let count = CGFloat(max(top.count, 1))
+    var hue: CGFloat = 0
+    var saturation: CGFloat = 0
+    UIColor(red: red / count, green: green / count, blue: blue / count, alpha: 1)
+      .getHue(&hue, saturation: &saturation, brightness: nil, alpha: nil)
+    return saturation < 0.18 ? nil : (hue, saturation)
+  }
+
+  nonisolated private static func surface(_ strongest: (hue: CGFloat, saturation: CGFloat)) -> UIColor {
+    UIColor { traits in
+      traits.userInterfaceStyle == .dark
+        ? UIColor(hue: strongest.hue, saturation: min(0.45, strongest.saturation * 0.6), brightness: 0.24, alpha: 1)
+        : UIColor(
+          hue: strongest.hue,
+          saturation: min(0.16, max(0.08, strongest.saturation * 0.25)),
+          brightness: 0.97,
+          alpha: 1
+        )
+    }
   }
 
   private static func key(_ url: URL, _ resolution: CoverResolution, _ wash: Bool) -> String {

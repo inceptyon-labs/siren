@@ -17,8 +17,8 @@ struct SirenHomeSection<Content: View>: View {
           .accessibilityHidden(true)
       }
       Text(title)
-        .font(.title2.bold())
-        .foregroundStyle(SirenTheme.ink)
+        .font(SirenType.display(.title2))
+        .foregroundStyle(SirenTheme.heading)
         .accessibilityAddTraits(.isHeader)
       content
     }
@@ -138,8 +138,24 @@ struct SirenContinueCard: View {
   var onResume: () -> Void
 
   @Environment(\.dynamicTypeSize) private var typeSize
+  @State private var tint: Color?
 
   var body: some View {
+    details
+      .padding(14)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      // The card takes its color from the cover, so the book you're in leads Home in its own color.
+      .background(
+        tint ?? SirenTheme.raised,
+        in: RoundedRectangle(cornerRadius: SirenTheme.rowRadius, style: .continuous)
+      )
+      .animation(.easeOut(duration: 0.35), value: tint)
+      .task(id: book.id) {
+        tint = await CoverStore.shared.tint(for: book).map(Color.init(uiColor:))
+      }
+  }
+
+  @ViewBuilder private var details: some View {
     // At accessibility text sizes the details need the full width, so they go under the cover.
     let layout =
       typeSize.isAccessibilitySize
@@ -176,7 +192,7 @@ struct SirenContinueCard: View {
         }
         Button(action: onResume) {
           Label(isPlaying ? "Pause" : "Resume", systemImage: isPlaying ? "pause.fill" : "play.fill")
-            .font(.headline)
+            .font(SirenType.display(.headline))
             .foregroundStyle(SirenTheme.onTint)
             .lineLimit(1)
             .fixedSize()
@@ -221,11 +237,11 @@ struct SirenGoalCard: View {
     VStack(alignment: .leading, spacing: 10) {
       HStack(alignment: .firstTextBaseline) {
         Text("\(count)")
-          .font(.largeTitle.weight(.bold))
+          .font(SirenType.display(.largeTitle, weight: .bold))
           .foregroundStyle(SirenTheme.ink)
           .monospacedDigit()
         Text(unit == .books ? "of \(goal) books" : "of \(goal) hours")
-          .font(.headline)
+          .font(SirenType.display(.headline))
           .foregroundStyle(SirenTheme.ink)
         Spacer()
         Image(systemName: "chevron.right")
