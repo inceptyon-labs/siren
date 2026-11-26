@@ -130,14 +130,17 @@ public enum ChapterNames {
   }
 
   /// How far Audible's length can be from the book's and still fit, in seconds.
-  nonisolated static let tolerance: Double = 5
+  /// How far Audible's length can be from the book's and still fit, in seconds. Generous, since
+  /// every chapter start must also line up within `markTolerance`.
+  nonisolated static let tolerance: Double = 60
   /// How far each of Audible's chapter starts can be from the book's own, in seconds.
   nonisolated static let markTolerance: Double = 2
 
   /// Audible's names for the book's own chapters. Only titles change: the book's chapter marks
-  /// stay. Audible's starts are taken as they are when the lengths agree, or moved back by
-  /// Audible's intro when the file was cut without the intro and outro; then there must be as many
-  /// as the book has, each within `markTolerance` of the book's.
+  /// stay. Audible's starts are taken as they are, or moved back by Audible's intro when the file
+  /// was cut without the intro and outro, whichever fits the book's length within `tolerance`;
+  /// then there must be as many as the book has, each within `markTolerance` of the book's.
+  /// Athena's `src/chapters.ts` does the same; keep the two in step.
   nonisolated static func match(
     _ audible: Audnexus,
     marks: [(start: Double, end: Double)],
@@ -151,17 +154,28 @@ public enum ChapterNames {
     let length = (audible.runtimeLengthMs ?? items.last.map { $0.startOffsetMs + $0.lengthMs } ?? 0) / 1000
     let intro = (audible.brandIntroDurationMs ?? 0) / 1000
     let outro = (audible.brandOutroDurationMs ?? 0) / 1000
-    let shift: Double
-    if abs(duration - length) <= tolerance {
-      shift = 0
-    } else if intro + outro > 0, abs(duration - (length - intro - outro)) <= tolerance {
-      shift = intro
-    } else {
-      return .lengthDiffers(length - duration)
+    // As Audible has it, or without its intro and outro when the file was cut without them.
+    var shifts: [(shift: Double, length: Double)] = [(0, length)]
+    if intro + outro > 0 { shifts.append((intro, length - intro - outro)) }
+    let fitting = shifts.filter { abs(duration - $0.length) <= tolerance }
+    guard !fitting.isEmpty else { return .lengthDiffers(length - duration) }
+    for candidate in fitting {
+      if let chapters = lineUp(items, shift: candidate.shift, marks: marks, duration: duration) {
+        return .ready(chapters)
+      }
     }
+    return .marksDiffer
+  }
 
-    // Audible's chapters as they fall in this file. A chapter that lay wholly inside the trimmed
-    // intro (its opening credits) isn't in the file.
+  /// Audible's chapters moved back by `shift`, with their names on the book's marks, or nil when
+  /// they don't line up.
+  nonisolated private static func lineUp(
+    _ items: [Audnexus.Item],
+    shift: Double,
+    marks: [(start: Double, end: Double)],
+    duration: Double
+  ) -> [Chapter]? {
+    // A chapter that lay wholly inside the trimmed intro (its opening credits) isn't in the file.
     var shifted: [(start: Double, title: String)] = []
     for item in items {
       let start = item.startOffsetMs / 1000 - shift
@@ -170,11 +184,10 @@ public enum ChapterNames {
     }
     guard shifted.count == marks.count,
       zip(shifted, marks).allSatisfy({ abs($0.start - $1.start) <= markTolerance })
-    else { return .marksDiffer }
-    let chapters = zip(marks, shifted).enumerated().map { index, pair in
+    else { return nil }
+    return zip(marks, shifted).enumerated().map { index, pair in
       Chapter(id: index, start: pair.0.start, end: pair.0.end, title: pair.1.title)
     }
-    return .ready(chapters)
   }
 
   /// "Chapter 1", "01", "Track 3", "Book Title - 07": a title that's only a number.
