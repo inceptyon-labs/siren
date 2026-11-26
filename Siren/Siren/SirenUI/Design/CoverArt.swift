@@ -291,14 +291,22 @@ enum SketchFilter {
     guard let cg = image.cgImage else { return nil }
     let input = CIImage(cgImage: cg)
     let extent = input.extent
+    let size = extent.size
     let mono = input.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0])
     let plainPaper = CIImage(color: paperColor).cropped(to: extent)
+    // The wash is hand-colouring under the pencil: the cover's hues, bled soft, at the paper's own
+    // lightness. The drawing still carries the light and dark, so a dark jacket gets its hatching,
+    // not a muddy copy of itself.
     let paper =
       wash
       ? input
-        .applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0.75])
-        .applyingFilter("CIColorMatrix", parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0.5)])
-        .composited(over: plainPaper)
+        .clampedToExtent()
+        .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: size.width / 60])
+        .cropped(to: extent)
+        .applyingFilter("CIVibrance", parameters: ["inputAmount": 1])
+        .applyingFilter("CIColorBlendMode", parameters: [kCIInputBackgroundImageKey: plainPaper])
+        // A saturated jacket (a yellow one) would turn neon at the paper's lightness.
+        .applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0.7])
       : plainPaper
 
     // Tone: how dark each region is. Mid-tones get one hatch layer, the darkest get a second.
@@ -312,7 +320,6 @@ enum SketchFilter {
       .applyingFilter("CIColorControls", parameters: [kCIInputContrastKey: 2.6, kCIInputBrightnessKey: -0.5])
       .applyingFilter("CIColorClamp")
 
-    let size = extent.size
     let light = CIImage(cgImage: hatchTexture(size: size, angle: .pi / 4, spacing: size.width / 70, seed: 11))
     let cross = CIImage(cgImage: hatchTexture(size: size, angle: -.pi / 3.2, spacing: size.width / 58, seed: 29))
 
@@ -468,7 +475,7 @@ final class CoverStore {
   }
 
   private static func key(_ url: URL, _ resolution: CoverResolution, _ wash: Bool) -> String {
-    "\(resolution.rawValue)\(wash ? "w" : ""):\(url.absoluteString)"
+    "\(resolution.rawValue)\(wash ? "w6" : ""):\(url.absoluteString)"
   }
 
   nonisolated private static func loadSquare(_ url: URL, side: Int) async -> UIImage? {

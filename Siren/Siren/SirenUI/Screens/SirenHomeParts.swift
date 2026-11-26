@@ -26,6 +26,110 @@ struct SirenHomeSection<Content: View>: View {
   }
 }
 
+extension View {
+  /// The tab bar already says Home, so the page opens on what you're listening to, not a title.
+  func sirenHomeTitle() -> some View {
+    navigationTitle("Home")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .principal) {
+          Color.clear.frame(width: 1, height: 1).accessibilityHidden(true)
+        }
+      }
+  }
+}
+
+/// Books as an inset group of rows: a small cover, the title, one line of detail, and Resume when
+/// the row can start playing.
+struct SirenBookRows: View {
+  let books: [SirenBook]
+  /// Rows shown before Show More.
+  var limit = 4
+  var detail: (SirenBook) -> String
+  var onOpen: (SirenBook) -> Void
+  var onResume: ((SirenBook) -> Void)?
+
+  @State private var showsAll = false
+
+  var body: some View {
+    let shown = showsAll ? books : Array(books.prefix(limit))
+    VStack(spacing: 0) {
+      ForEach(Array(shown.enumerated()), id: \.element.id) { index, book in
+        row(book)
+        if index < shown.count - 1 {
+          Divider().padding(.leading, 68)
+        }
+      }
+      if shown.count < books.count {
+        Divider()
+        Button("Show \(books.count - shown.count) More") {
+          withAnimation(.snappy) { showsAll = true }
+        }
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(SirenTheme.tint)
+        .frame(maxWidth: .infinity, minHeight: 44)
+      }
+    }
+    .background(SirenTheme.raised, in: RoundedRectangle(cornerRadius: SirenTheme.rowRadius, style: .continuous))
+  }
+
+  private func row(_ book: SirenBook) -> some View {
+    HStack(spacing: 12) {
+      Button {
+        onOpen(book)
+      } label: {
+        HStack(spacing: 12) {
+          RevealCover(book: book, cornerRadius: 4, shadow: false)
+            .frame(width: 44, height: 44)
+          VStack(alignment: .leading, spacing: 3) {
+            Text(book.title)
+              .font(SirenType.bookTitle(.headline))
+              .foregroundStyle(SirenTheme.ink)
+              .lineLimit(1)
+            let line = detail(book)
+            if !line.isEmpty {
+              Text(line)
+                .font(.footnote)
+                .foregroundStyle(SirenTheme.secondary)
+                .monospacedDigit()
+                .lineLimit(1)
+            }
+          }
+          Spacer(minLength: 8)
+          if onResume == nil {
+            Image(systemName: "chevron.right")
+              .font(.footnote.weight(.semibold))
+              .foregroundStyle(SirenTheme.secondary.opacity(0.6))
+          }
+        }
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .accessibilityElement(children: .combine)
+
+      if let onResume {
+        Button {
+          onResume(book)
+        } label: {
+          Image(systemName: "play.fill")
+            .font(.footnote.weight(.bold))
+            .foregroundStyle(SirenTheme.onTint)
+            .frame(width: 32, height: 32)
+            .background(SirenTheme.tint, in: Circle())
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("Resume \(book.title)"))
+      }
+    }
+    .padding(.leading, 12)
+    .padding(.trailing, onResume == nil ? 12 : 6)
+    .padding(.vertical, onResume == nil ? 10 : 4)
+    .frame(minHeight: 64)
+  }
+}
+
 /// Home's lead: the book you're in, half inked, with Resume.
 struct SirenContinueCard: View {
   let book: SirenBook
@@ -189,7 +293,7 @@ struct SirenCoverShelf: View {
                 .font(SirenType.bookTitle(.footnote))
                 .foregroundStyle(SirenTheme.ink)
                 .multilineTextAlignment(.leading)
-                .lineLimit(2, reservesSpace: true)
+                .lineLimit(2)
               if !book.author.isEmpty {
                 Text(book.author)
                   .font(.caption)

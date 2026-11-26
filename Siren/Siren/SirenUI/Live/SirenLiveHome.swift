@@ -6,7 +6,7 @@ import SwiftUI
 /// Home bound to upstream's `HomePageModel`: Continue Listening, the yearly goal, then the
 /// server's shelves in the order set in Settings › Home.
 struct SirenLiveHome: View {
-  @StateObject private var model: HomePage.Model = HomePageModel()
+  @StateObject private var model: HomePage.Model
   @ObservedObject private var playerManager = PlayerManager.shared
   @ObservedObject private var authentication = Audiobookshelf.shared.authentication
   @ObservedObject private var libraries = Audiobookshelf.shared.libraries
@@ -34,6 +34,15 @@ struct SirenLiveHome: View {
     var hoursListened: Int
   }
 
+  /// `preview` stands in for the server's shelves (the `live-home` demo screen).
+  init(preview: HomePage.Model? = nil) {
+    _model = StateObject(wrappedValue: preview ?? HomePageModel())
+    if preview != nil {
+      let finished = Array(Demo.finished2026.prefix(6))
+      _year = State(initialValue: YearGoal(finished: finished, booksFinished: finished.count, hoursListened: 70))
+    }
+  }
+
   var body: some View {
     ScrollView {
       // Sections space themselves (SirenHomeSection), so an empty shelf takes no room.
@@ -54,7 +63,7 @@ struct SirenLiveHome: View {
 
         if sizeClass == .regular {
           HStack(alignment: .top, spacing: 28) {
-            continueSection
+            continueListening
               .frame(maxWidth: .infinity, alignment: .leading)
             if showGoal, year != nil {
               SirenHomeSection(title: "Your \(String(Calendar.current.component(.year, from: .now)))", divided: false) {
@@ -65,7 +74,7 @@ struct SirenLiveHome: View {
           }
         } else {
           VStack(alignment: .leading, spacing: 14) {
-            continueSection
+            continueListening
             goalCard
           }
         }
@@ -93,7 +102,7 @@ struct SirenLiveHome: View {
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .background(SirenTheme.ground)
-    .navigationTitle("Home")
+    .sirenHomeTitle()
     .toolbar {
       ToolbarItem(placement: .topBarTrailing) { profileMenu }
     }
@@ -156,7 +165,7 @@ struct SirenLiveHome: View {
 
   // MARK: Continue Listening
 
-  @ViewBuilder private var continueSection: some View {
+  @ViewBuilder private var continueListening: some View {
     if let hero {
       SirenHomeSection(title: "Continue Listening", divided: false) {
         SirenContinueCard(
@@ -165,6 +174,18 @@ struct SirenLiveHome: View {
           onOpen: { open(hero.id) },
           onResume: { resume(hero.id) }
         )
+        // The other books you're partway through, a tap from resuming.
+        let others = continueItems.dropFirst().map(SirenBook.init(card:))
+        if !others.isEmpty {
+          SirenBookRows(
+            books: others,
+            limit: 3,
+            detail: { $0.timeLeft.isEmpty ? $0.author : "\($0.timeLeft) left · \($0.author)" },
+            onOpen: { open($0.id) },
+            onResume: { resume($0.id) }
+          )
+          .padding(.top, 4)
+        }
       }
     } else if !model.isLoading, libraries.current != nil {
       emptyState
@@ -184,10 +205,17 @@ struct SirenLiveHome: View {
     }
   }
 
-  private var continueItems: [BookCard.Model] {
-    for section in model.sections {
-      if case .continueBooks(let items) = section.items { return items.items }
+  /// The first in-progress section (Continue Listening) leads Home; any later one (Continue
+  /// Reading) gets its own shelf.
+  private var continueSection: HomePage.Model.Section? {
+    model.sections.first { section in
+      if case .continueBooks = section.items { return true }
+      return false
     }
+  }
+
+  private var continueItems: [BookCard.Model] {
+    if case .continueBooks(let items) = continueSection?.items { return items.items }
     return []
   }
 
@@ -269,9 +297,18 @@ struct SirenLiveHome: View {
 
   @ViewBuilder private func shelf(_ section: HomePage.Model.Section) -> some View {
     switch section.items {
-    case .continueBooks(let items) where items.items.count > 1:
-      SirenHomeSection(title: "Also Listening") {
-        SirenCoverShelf(books: items.items.dropFirst().map(SirenBook.init(card:))) { open($0.id) }
+    case .continueBooks(let items) where section.id != continueSection?.id && !items.items.isEmpty:
+      SirenHomeSection(title: section.title) {
+        SirenCoverShelf(books: items.items.map(SirenBook.init(card:))) { open($0.id) }
+      }
+    case .books(let items) where section.id == "continue-series" && !items.isEmpty:
+      // The next book in each series: which one it is matters more than its cover.
+      SirenHomeSection(title: section.title) {
+        SirenBookRows(
+          books: items.map(SirenBook.init(card:)),
+          detail: { book in book.seriesIndex.map { "Book \($0) · \(book.author)" } ?? book.author },
+          onOpen: { open($0.id) }
+        )
       }
     case .books(let items) where !items.isEmpty:
       SirenHomeSection(title: section.title) {

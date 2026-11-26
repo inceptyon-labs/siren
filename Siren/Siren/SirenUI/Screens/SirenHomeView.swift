@@ -50,7 +50,7 @@ struct SirenHomeView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .background(SirenTheme.ground)
-    .navigationTitle("Home")
+    .sirenHomeTitle()
     .toolbar {
       ToolbarItem(placement: .topBarTrailing) {
         Button(action: onOpenSettings) {
