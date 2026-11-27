@@ -285,19 +285,17 @@ struct CoverArtwork: View {
 enum SketchFilter {
   private static let context = CIContext(options: [.cacheIntermediates: false])
   static let paperColor = CIColor(red: 236 / 255, green: 234 / 255, blue: 228 / 255)
-  private static let graphite = CIColor(red: 0.33, green: 0.345, blue: 0.37)
+  private static let graphite = CIColor(red: 0.16, green: 0.165, blue: 0.18)
 
   static func sketch(_ image: UIImage, wash: Bool = false) -> UIImage? {
     guard let cg = image.cgImage else { return nil }
     let input = CIImage(cgImage: cg)
     let extent = input.extent
     let size = extent.size
-    let mono = input.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0])
     let plainPaper = CIImage(color: paperColor).cropped(to: extent)
     // The wash is hand-coloring under the pencil: the cover's hues, bled soft, at the paper's own
-    // lightness. The drawing still carries the light and dark, so a dark jacket gets its hatching,
-    // not a muddy copy of itself.
-    let paper =
+    // lightness. The drawing still carries the light and dark.
+    var paper =
       wash
       ? input
         .clampedToExtent()
@@ -308,54 +306,54 @@ enum SketchFilter {
         // A saturated jacket (a yellow one) would turn neon at the paper's lightness.
         .applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0.7])
       : plainPaper
+    // A light, even hatch over the whole sheet: the paper's grain, not the cover's shading.
+    let grain = CIImage(cgImage: hatchTexture(size: size, angle: .pi * 48 / 180, spacing: size.width / 40, seed: 5))
+    paper = grain.composited(over: paper)
 
-    // Tone: how dark each region is. Mid-tones get one hatch layer, the darkest get a second.
-    let darkness = mono.applyingFilter("CIColorInvert")
-    let midMask =
-      darkness
-      .applyingFilter("CIColorControls", parameters: [kCIInputContrastKey: 1.6, kCIInputBrightnessKey: -0.18])
-      .applyingFilter("CIColorClamp")
-    let deepMask =
-      darkness
-      .applyingFilter("CIColorControls", parameters: [kCIInputContrastKey: 2.6, kCIInputBrightnessKey: -0.5])
-      .applyingFilter("CIColorClamp")
-
-    let light = CIImage(cgImage: hatchTexture(size: size, angle: .pi / 4, spacing: size.width / 70, seed: 11))
-    let cross = CIImage(cgImage: hatchTexture(size: size, angle: -.pi / 3.2, spacing: size.width / 58, seed: 29))
-
-    let shaded = light.composited(over: paper)
-      .applyingFilter(
-        "CIBlendWithMask",
-        parameters: [kCIInputBackgroundImageKey: paper, kCIInputMaskImageKey: midMask]
-      )
-    let crossed = cross.composited(over: shaded)
-      .applyingFilter(
-        "CIBlendWithMask",
-        parameters: [kCIInputBackgroundImageKey: shaded, kCIInputMaskImageKey: deepMask]
-      )
-
-    // Outlines: one clean line per color boundary.
-    let edges =
+    // Lines: the Laplacian of the gray cover, found at half size (so a line is a soft two pixels)
+    // on perceptual gray, the way a pen follows what the eye sees as an edge. Blur and gain scale
+    // with the size, so the large cover draws like the small one.
+    let scale: CGFloat = 0.5
+    let r = size.width * scale / 180
+    let work = CGRect(x: 0, y: 0, width: (size.width * scale).rounded(), height: (size.height * scale).rounded())
+    let gray =
       input
-      .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 0.6]).cropped(to: extent)
-      .applyingFilter("CIMorphologyGradient", parameters: [kCIInputRadiusKey: max(1.2, size.width / 400)])
-      .applyingFilter("CIMaximumComponent")
+      .clampedToExtent()
+      .transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+      .cropped(to: work)
+      .applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0])
+      .applyingFilter("CILinearToSRGBToneCurve")
+      .clampedToExtent()
+      .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 0.7 * r])
+    // A sharpen kernel sums to one, so alpha stays whole; minus the image, it's the Laplacian.
+    let sharpened = gray.applyingFilter(
+      "CIConvolution3X3",
+      parameters: ["inputWeights": CIVector(values: [-1, -1, -1, -1, 9, -1, -1, -1, -1], count: 9), "inputBias": 0]
+    )
+    let gain = 4.4 * r * r
+    let lines =
+      gray
+      .applyingFilter("CISubtractBlendMode", parameters: [kCIInputBackgroundImageKey: sharpened])
+      .cropped(to: work)
       .applyingFilter(
         "CIColorMatrix",
         parameters: [
-          "inputRVector": CIVector(x: 7, y: 0, z: 0, w: 0),
-          "inputGVector": CIVector(x: 0, y: 7, z: 0, w: 0),
-          "inputBVector": CIVector(x: 0, y: 0, z: 7, w: 0),
-          "inputBiasVector": CIVector(x: -0.5, y: -0.5, z: -0.5, w: 0),
+          "inputRVector": CIVector(x: gain, y: 0, z: 0, w: 0),
+          "inputGVector": CIVector(x: 0, y: gain, z: 0, w: 0),
+          "inputBVector": CIVector(x: 0, y: 0, z: gain, w: 0),
+          "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+          "inputBiasVector": CIVector(x: 0, y: 0, z: 0, w: 1),
         ]
       )
       .applyingFilter("CIColorClamp")
-      .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 0.6])
+      .applyingFilter("CIMaximumComponent")
+      .clampedToExtent()
+      .transformed(by: CGAffineTransform(scaleX: 1 / scale, y: 1 / scale))
       .cropped(to: extent)
     let pencil = CIImage(color: graphite).cropped(to: extent)
     let result = pencil.applyingFilter(
       "CIBlendWithMask",
-      parameters: [kCIInputBackgroundImageKey: crossed, kCIInputMaskImageKey: edges]
+      parameters: [kCIInputBackgroundImageKey: paper, kCIInputMaskImageKey: lines]
     )
 
     guard let out = context.createCGImage(result, from: extent) else { return nil }
@@ -365,7 +363,7 @@ enum SketchFilter {
   private static let textureLock = NSLock()
   nonisolated(unsafe) private static var textures: [String: CGImage] = [:]
 
-  /// Loose pencil hatching: broken strokes with varied weight, spacing and pressure.
+  /// The paper's grain: long, faint pencil strokes with varied weight, spacing and pressure.
   private static func hatchTexture(size: CGSize, angle: CGFloat, spacing: CGFloat, seed: UInt64) -> CGImage {
     let key = "\(Int(size.width))x\(Int(size.height))-\(angle)-\(seed)"
     if let hit = textureLock.withLock({ textures[key] }) { return hit }
@@ -383,11 +381,11 @@ enum SketchFilter {
       while y < diagonal / 2 {
         var x = -diagonal / 2
         while x < diagonal / 2 {
-          let length = spacing * CGFloat(3 + rng.next() * 9)
+          let length = spacing * CGFloat(8 + rng.next() * 12)
           let drift = CGFloat(rng.next() - 0.5) * spacing * 0.35
-          cg.setLineWidth(CGFloat(0.8 + rng.next() * 1.1) * size.width / 600)
+          cg.setLineWidth(CGFloat(0.8 + rng.next() * 1.1) * size.width / 860)
           cg.setStrokeColor(
-            UIColor(red: 0.33, green: 0.345, blue: 0.37, alpha: CGFloat(0.28 + rng.next() * 0.32)).cgColor
+            UIColor(red: 0.33, green: 0.345, blue: 0.37, alpha: CGFloat(0.12 + rng.next() * 0.1)).cgColor
           )
           cg.move(to: CGPoint(x: x, y: y))
           cg.addLine(to: CGPoint(x: x + length, y: y + drift))
@@ -585,7 +583,8 @@ final class CoverStore {
   }
 
   private static func key(_ url: URL, _ resolution: CoverResolution, _ wash: Bool) -> String {
-    "\(resolution.rawValue)\(wash ? "w6" : ""):\(url.absoluteString)"
+    // "p2": the pen-line sketch; sketches cached under older keys are never read again.
+    "\(resolution.rawValue)p2\(wash ? "w6" : ""):\(url.absoluteString)"
   }
 
   nonisolated private static func loadSquare(_ url: URL, side: Int) async -> UIImage? {

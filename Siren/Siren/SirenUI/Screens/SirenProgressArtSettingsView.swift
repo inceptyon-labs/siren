@@ -61,7 +61,7 @@ struct SirenProgressArtSettingsView: View {
         case .map: Text("The full player opens on the map; swipe the art for the cover.")
         case .voice:
           Text(
-            "The full player opens on the voice print, drawn from the book's audio, for downloaded books. Streamed books show the cover."
+            "The full player opens on the voice print, drawn from the book's audio. It needs the book downloaded; a streamed book offers the download there."
           )
         }
       }

@@ -40,6 +40,8 @@ struct SirenPlayerView<MoreMenu: View>: View {
   var flags: [Double] = []
   /// The voice print's ridges from the book's audio; nil draws the demo's.
   var voiceRidges: [[Double]?]?
+  /// Set for a streamed book: the voice print needs its audio on the device.
+  var voiceDownload: VoicePrintView.Download?
   @Binding var art: PlayerArt
   @ViewBuilder var moreMenu: () -> MoreMenu
 
@@ -165,7 +167,7 @@ struct SirenPlayerView<MoreMenu: View>: View {
       FogMapArt(book: book, flags: flags)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     case .voice:
-      VoicePrintView(book: book, ridges: voiceRidges)
+      VoicePrintView(book: book, ridges: voiceDownload == nil ? voiceRidges : [], download: voiceDownload)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
   }
@@ -310,10 +312,34 @@ struct SirenPlayerView<MoreMenu: View>: View {
 struct VoicePrintView: View {
   static let samples = 150
 
+  /// A streamed book's way to the voice print: download it, then its audio can be read.
+  struct Download {
+    /// 0–1 while downloading, nil before.
+    var progress: Double?
+    var start: () -> Void
+  }
+
   let book: SirenBook
   var ridges: [[Double]?]?
+  var download: Download?
+
+  /// Chapters whose audio hasn't been read yet, while the scan works through the book.
+  private var unread: Int {
+    guard download == nil, let ridges else { return 0 }
+    return ridges.filter { $0 == nil }.count
+  }
 
   var body: some View {
+    // The prompt sits outside the print's single accessibility element, so VoiceOver reaches it.
+    ridgelines
+      .overlay {
+        if let download {
+          downloadPrompt(download)
+        }
+      }
+  }
+
+  private var ridgelines: some View {
     ZStack(alignment: .topTrailing) {
       Canvas { ctx, size in
         let count = book.chapterCount
@@ -377,17 +403,54 @@ struct VoicePrintView: View {
       RevealCover(book: book, progress: 1, cornerRadius: 4)
         .frame(width: 48, height: 48)
         .padding(10)
-      Text("\(book.currentChapter - 1) of \(book.chapterCount) chapters heard")
-        .font(.caption.weight(.medium))
-        .foregroundStyle(Color(sirenHex: 0xA3A8B2))
-        .padding(.leading, 14)
-        .padding(.top, 14)
-        .frame(maxWidth: .infinity, alignment: .leading)
+      VStack(alignment: .leading, spacing: 2) {
+        Text("\(book.currentChapter - 1) of \(book.chapterCount) chapters heard")
+        if unread > 0 {
+          Text("Reading the audio, \(book.chapterCount - unread) of \(book.chapterCount) chapters")
+        }
+      }
+      .font(.caption.weight(.medium))
+      .foregroundStyle(Color(sirenHex: 0xA3A8B2))
+      .monospacedDigit()
+      .padding(.leading, 14)
+      .padding(.top, 14)
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(
       "Voice print of \(book.title): \(book.currentChapter - 1) of \(book.chapterCount) chapters heard"
     )
+  }
+
+  private func downloadPrompt(_ download: Download) -> some View {
+    VStack(spacing: 12) {
+      Image(systemName: "waveform")
+        .font(.title)
+      Text("The voice print is drawn from the book's audio, so it needs the book on this device.")
+        .font(.subheadline)
+        .multilineTextAlignment(.center)
+        .fixedSize(horizontal: false, vertical: true)
+      if let progress = download.progress {
+        ProgressView(value: progress)
+          .tint(Color(sirenHex: 0x3FB6BF))
+          .frame(maxWidth: 180)
+        Text("Downloading, \(Int((progress * 100).rounded()))%")
+          .font(.footnote)
+          .monospacedDigit()
+          .foregroundStyle(Color(sirenHex: 0xA3A8B2))
+      } else {
+        Button("Download", systemImage: "arrow.down.circle", action: download.start)
+          .font(.headline)
+          .buttonStyle(.borderedProminent)
+          .buttonBorderShape(.capsule)
+          .tint(Color(sirenHex: 0x3FB6BF))
+          .foregroundStyle(Color(sirenHex: 0x111316))
+      }
+    }
+    .foregroundStyle(Color(sirenHex: 0xF2F2F0))
+    .padding(.horizontal, 32)
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .background(Color(sirenHex: 0x1C1F24).opacity(0.82))
   }
 
   /// The chapter's heights, and whether they come from its audio (or the demo) rather than a

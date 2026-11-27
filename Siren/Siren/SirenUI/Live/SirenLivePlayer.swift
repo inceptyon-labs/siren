@@ -27,6 +27,7 @@ struct SirenLivePlayer: View {
       pages: pages,
       flags: flags,
       voiceRidges: voiceRidges,
+      voiceDownload: voiceDownload,
       art: $art
     ) {
       moreMenu
@@ -38,6 +39,9 @@ struct SirenLivePlayer: View {
       UIApplication.shared.isIdleTimerDisabled = preferences.keepScreenAwakeInPlayer
     }
     .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
+    .onChange(of: pages) { _, pages in
+      if !pages.contains(art) { art = .cover }
+    }
     .onChange(of: preferences.keepScreenAwakeInPlayer) { _, newValue in
       UIApplication.shared.isIdleTimerDisabled = newValue
     }
@@ -59,13 +63,24 @@ struct SirenLivePlayer: View {
     }
   }
 
-  /// With Map or Voice print chosen the player opens on it, and the cover is a swipe away. The voice
-  /// print needs the book downloaded.
+  /// With Map or Voice print chosen the player opens on it, and the cover is a swipe away.
   private var pages: [PlayerArt] {
     switch playerArt {
     case .cover: [.cover]
     case .map: [.cover, .map]
-    case .voice: voiceSource == nil ? [.cover] : [.cover, .voice]
+    // A book still to download gets the voice page with its download prompt. Episodes, and
+    // downloaded books whose files or chapters can't be read, stay on the cover.
+    case .voice: voiceSource != nil || voiceDownload != nil ? [.cover, .voice] : [.cover]
+    }
+  }
+
+  /// The voice print needs the book's audio on the device; a streamed book offers the download.
+  private var voiceDownload: VoicePrintView.Download? {
+    guard playerArt == .voice, model.podcastID == nil, voiceSource == nil else { return nil }
+    switch model.downloadState {
+    case .downloaded: return nil
+    case .downloading(let progress): return VoicePrintView.Download(progress: progress) {}
+    case .notDownloaded: return VoicePrintView.Download(progress: nil) { model.onDownloadTapped() }
     }
   }
 
@@ -76,7 +91,8 @@ struct SirenLivePlayer: View {
   }
 
   private var voiceRidges: [[Double]?]? {
-    guard let voiceSource else { return nil }
+    // Never the demo's made-up ridges: no source yet draws flat lines.
+    guard let voiceSource else { return [] }
     _ = SirenAudioScan.shared.revision
     return SirenVoicePrint.ridges(voiceSource, samples: VoicePrintView.samples)
   }
