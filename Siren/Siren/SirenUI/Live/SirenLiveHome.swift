@@ -27,6 +27,8 @@ struct SirenLiveHome: View {
   @State private var showingAdmin = false
   @State private var sentRefresh = 0
   @State private var profiles = SirenProfiles.shared
+  /// The full-width cover is under the status bar, which then needs light text.
+  @State private var overCover = true
 
   private struct YearGoal {
     var finished: [SirenBook]
@@ -40,67 +42,35 @@ struct SirenLiveHome: View {
     if preview != nil {
       let finished = Array(Demo.finished2026.prefix(6))
       _year = State(initialValue: YearGoal(finished: finished, booksFinished: finished.count, hoursListened: 70))
+      // Chapters come from the server for a live hero; the preview makes some up.
+      if case .continueBooks(let items) = preview?.sections.first?.items, let first = items.items.first {
+        var detail = SirenBook(card: first)
+        detail.chapterCount = 34
+        detail.chapterMarks = (0..<34).map { Double($0) / 34 }
+        detail.currentChapter = 14
+        detail.chapterTitle = "The Spice Harvest"
+        detail.chapterRemaining = "18:42"
+        _heroDetail = State(initialValue: detail)
+      }
     }
   }
 
   var body: some View {
     ScrollView {
-      // Sections space themselves (SirenHomeSection), so an empty shelf takes no room.
       VStack(alignment: .leading, spacing: 0) {
-        if authentication.server?.status == .authenticationError {
-          signedOutBanner
-            .padding(.bottom, 14)
+        if bleeds, let hero {
+          SirenNowHeader(
+            book: hero,
+            isPlaying: isPlaying(hero.id),
+            onOpen: { open(hero.id) },
+            onResume: { resume(hero.id) }
+          )
         }
-        if let error = model.error {
-          Text(error)
-            .font(.subheadline)
-            .foregroundStyle(SirenTheme.ink)
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.red.opacity(0.15), in: RoundedRectangle(cornerRadius: SirenTheme.rowRadius))
-            .padding(.bottom, 14)
-        }
-
-        if sizeClass == .regular {
-          HStack(alignment: .top, spacing: 28) {
-            continueListening
-              .frame(maxWidth: .infinity, alignment: .leading)
-            if showGoal, year != nil {
-              SirenHomeSection(title: "Your \(String(Calendar.current.component(.year, from: .now)))", divided: false) {
-                goalCard
-              }
-              .frame(maxWidth: 460)
-            }
-          }
-        } else {
-          VStack(alignment: .leading, spacing: 14) {
-            continueListening
-            goalCard
-          }
-        }
-
-        SirenRequestsShelf(refreshID: sentRefresh)
-
-        if let username = authentication.server?.username, let libraryID = libraries.current?.id {
-          SirenSentShelf(username: username, libraryID: libraryID, refreshID: sentRefresh) { open($0.id) }
-            .id("\(libraryID)/\(username)")
-        }
-
-        // Requests are off in a kids profile, and these are all books to request.
-        if !profiles.isKidsActive {
-          SirenBecauseYouLikedShelf { router.homePath.append(SirenRoute.requests) }
-          SirenComingSoonShelf { router.homePath.append(SirenRoute.requests) }
-        }
-        SirenHighlyRatedShelf { open($0.id) }
-
-        ForEach(model.sections, id: \.id) { section in
-          shelf(section)
-        }
+        content
       }
-      .padding(.horizontal, 20)
-      .padding(.bottom, 32)
-      .frame(maxWidth: .infinity, alignment: .leading)
     }
+    .ignoresSafeArea(edges: bleeds ? .top : [])
+    .modifier(CoverUnderStatusBar(active: bleeds, overCover: $overCover))
     .background(SirenTheme.ground)
     .sirenHomeTitle()
     .toolbar {
@@ -143,6 +113,68 @@ struct SirenLiveHome: View {
     }
   }
 
+  /// On iPhone the book you're in leads Home full width, up under the status bar.
+  private var bleeds: Bool { sizeClass != .regular && hero != nil }
+
+  private var content: some View {
+    // Sections space themselves (SirenHomeSection), so an empty shelf takes no room.
+    VStack(alignment: .leading, spacing: 0) {
+      if authentication.server?.status == .authenticationError {
+        signedOutBanner
+          .padding(.bottom, 14)
+      }
+      if let error = model.error {
+        Text(error)
+          .font(.subheadline)
+          .foregroundStyle(SirenTheme.ink)
+          .padding(12)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .background(.red.opacity(0.15), in: RoundedRectangle(cornerRadius: SirenTheme.rowRadius))
+          .padding(.bottom, 14)
+      }
+
+      if sizeClass == .regular {
+        HStack(alignment: .top, spacing: 28) {
+          continueListening
+            .frame(maxWidth: .infinity, alignment: .leading)
+          if showGoal, year != nil {
+            SirenHomeSection(title: "Your \(String(Calendar.current.component(.year, from: .now)))", divided: false) {
+              goalCard
+            }
+            .frame(maxWidth: 460)
+          }
+        }
+      } else {
+        VStack(alignment: .leading, spacing: 14) {
+          continueListening
+          goalCard
+        }
+      }
+
+      SirenRequestsShelf(refreshID: sentRefresh)
+
+      if let username = authentication.server?.username, let libraryID = libraries.current?.id {
+        SirenSentShelf(username: username, libraryID: libraryID, refreshID: sentRefresh) { open($0.id) }
+          .id("\(libraryID)/\(username)")
+      }
+
+      // Requests are off in a kids profile, and these are all books to request.
+      if !profiles.isKidsActive {
+        SirenBecauseYouLikedShelf { router.homePath.append(SirenRoute.requests) }
+        SirenComingSoonShelf { router.homePath.append(SirenRoute.requests) }
+      }
+      SirenHighlyRatedShelf { open($0.id) }
+
+      ForEach(model.sections, id: \.id) { section in
+        shelf(section)
+      }
+    }
+    .padding(.horizontal, 20)
+    .padding(.top, bleeds ? 20 : 0)
+    .padding(.bottom, 32)
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
   /// The server turned this sign-in away: a revoked invite key, or a changed password.
   private var signedOutBanner: some View {
     VStack(alignment: .leading, spacing: 10) {
@@ -166,7 +198,15 @@ struct SirenLiveHome: View {
   // MARK: Continue Listening
 
   @ViewBuilder private var continueListening: some View {
-    if let hero {
+    if bleeds {
+      // The header already shows the first book.
+      let others = continueItems.dropFirst().map(SirenBook.init(card:))
+      if !others.isEmpty {
+        SirenHomeSection(title: "Also Listening", divided: false) {
+          otherRows(others)
+        }
+      }
+    } else if let hero {
       SirenHomeSection(title: "Continue Listening", divided: false) {
         SirenContinueCard(
           book: hero,
@@ -177,19 +217,23 @@ struct SirenLiveHome: View {
         // The other books you're partway through, a tap from resuming.
         let others = continueItems.dropFirst().map(SirenBook.init(card:))
         if !others.isEmpty {
-          SirenBookRows(
-            books: others,
-            limit: 3,
-            detail: { $0.timeLeft.isEmpty ? $0.author : "\($0.timeLeft) left · \($0.author)" },
-            onOpen: { open($0.id) },
-            onResume: { resume($0.id) }
-          )
-          .padding(.top, 4)
+          otherRows(others)
+            .padding(.top, 4)
         }
       }
     } else if !model.isLoading, libraries.current != nil {
       emptyState
     }
+  }
+
+  private func otherRows(_ books: [SirenBook]) -> some View {
+    SirenBookRows(
+      books: books,
+      limit: 3,
+      detail: { $0.timeLeft.isEmpty ? $0.author : "\($0.timeLeft) left · \($0.author)" },
+      onOpen: { open($0.id) },
+      onResume: { resume($0.id) }
+    )
   }
 
   @ViewBuilder private var goalCard: some View {
@@ -450,5 +494,35 @@ struct SirenLiveHome: View {
   private var initial: String {
     let name = authentication.server?.username ?? ""
     return name.first.map { String($0).uppercased() } ?? "S"
+  }
+}
+
+/// Light status bar text, and no scroll edge blur, while the full-width cover is under the bar.
+private struct CoverUnderStatusBar: ViewModifier {
+  let active: Bool
+  @Binding var overCover: Bool
+
+  func body(content: Content) -> some View {
+    if #available(iOS 26.0, *) {
+      tracked(content)
+        .toolbarColorScheme(active && overCover ? .dark : nil, for: .navigationBar)
+        .scrollEdgeEffectHidden(active && overCover, for: .top)
+    } else {
+      tracked(content)
+        .toolbarColorScheme(active && overCover ? .dark : nil, for: .navigationBar)
+    }
+  }
+
+  @ViewBuilder private func tracked(_ content: Content) -> some View {
+    if #available(iOS 18.0, *) {
+      content.onScrollGeometryChange(for: Bool.self) { geometry in
+        // The cover is as tall as the screen is wide; past most of it, the bar is over the band.
+        geometry.contentOffset.y < geometry.containerSize.width - 60
+      } action: { _, isOver in
+        overCover = isOver
+      }
+    } else {
+      content
+    }
   }
 }

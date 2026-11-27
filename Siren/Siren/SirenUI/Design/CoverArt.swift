@@ -478,6 +478,16 @@ final class CoverStore {
   /// A pale surface color from the cover's strongest color (a dark one in Dark Mode), or nil for a
   /// cover with no real color in it.
   func tint(for book: SirenBook) async -> UIColor? {
+    await strongest(for: book).map(Self.surface)
+  }
+
+  /// A deep color from the cover's strongest color that white text reads on, or nil for a cover
+  /// with no real color in it.
+  func band(for book: SirenBook) async -> UIColor? {
+    await strongest(for: book).map(Self.band)
+  }
+
+  private func strongest(for book: SirenBook) async -> CoverColor? {
     let key = book.coverURL?.absoluteString ?? "\(book.cover.hashValue)"
     if let hit = tints[key] { return hit.color }
     let image: UIImage? =
@@ -488,12 +498,14 @@ final class CoverStore {
       }
     // A cover that didn't load is tried again next time; a gray one stays untinted.
     guard let image else { return nil }
-    let color = Self.strongestColor(image).map(Self.surface)
+    let color = Self.strongestColor(image)
     tints[key] = TintEntry(color: color)
     return color
   }
 
-  private struct TintEntry { let color: UIColor? }
+  typealias CoverColor = (hue: CGFloat, saturation: CGFloat)
+
+  private struct TintEntry { let color: CoverColor? }
 
   /// The average of the cover's most saturated, brightest pixels: its color, not its muddy average.
   nonisolated private static func strongestColor(_ image: UIImage) -> (hue: CGFloat, saturation: CGFloat)? {
@@ -558,6 +570,17 @@ final class CoverStore {
           brightness: 0.97,
           alpha: 1
         )
+    }
+  }
+
+  nonisolated private static func band(_ strongest: CoverColor) -> UIColor {
+    UIColor { traits in
+      UIColor(
+        hue: strongest.hue,
+        saturation: min(0.7, max(0.3, strongest.saturation * 0.9)),
+        brightness: traits.userInterfaceStyle == .dark ? 0.3 : 0.36,
+        alpha: 1
+      )
     }
   }
 

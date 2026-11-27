@@ -207,6 +207,130 @@ struct SirenContinueCard: View {
   }
 }
 
+/// Home's lead on iPhone: the book you're in, full width and up under the status bar, then a band
+/// in the cover's own color with the chapter and Resume.
+struct SirenNowHeader: View {
+  let book: SirenBook
+  var isPlaying = false
+  var onOpen: () -> Void
+  var onResume: () -> Void
+
+  @AppStorage(SirenSettings.coverReveal) private var revealsProgress = true
+  @State private var band: Color?
+
+  /// Gray covers and covers still loading get the heading teal.
+  private var bandColor: Color { band ?? Color(sirenHex: 0x17474E) }
+
+  var body: some View {
+    VStack(spacing: 0) {
+      Button(action: onOpen) {
+        RevealCover(book: book, showTicks: true, cornerRadius: 0, shadow: false, resolution: .large)
+          .overlay(alignment: .top) {
+            // Keeps the status bar and the profile button readable on any cover.
+            LinearGradient(colors: [.black.opacity(0.5), .black.opacity(0)], startPoint: .top, endPoint: .bottom)
+              .frame(height: 150)
+              .allowsHitTesting(false)
+          }
+          .overlay(alignment: .bottom) {
+            // With the reveal off the cover can't show how far in you are, so a bar does.
+            if !revealsProgress {
+              GeometryReader { proxy in
+                Rectangle()
+                  .fill(.white)
+                  .frame(width: proxy.size.width * book.progress, height: 4)
+              }
+              .frame(height: 4)
+            }
+          }
+      }
+      .buttonStyle(.plain)
+
+      details
+        .padding(.horizontal, 20)
+        .padding(.top, 18)
+        .padding(.bottom, 22)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(bandColor)
+    }
+    .animation(.easeOut(duration: 0.35), value: band)
+    .task(id: book.id) {
+      band = await CoverStore.shared.band(for: book).map(Color.init(uiColor:))
+    }
+  }
+
+  private var details: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Button(action: onOpen) {
+        VStack(alignment: .leading, spacing: 5) {
+          Text(book.title)
+            .font(SirenType.bookTitle(.largeTitle))
+            .foregroundStyle(.white)
+            .lineLimit(3)
+          Text(book.author)
+            .font(.subheadline)
+            .foregroundStyle(.white.opacity(0.75))
+            .lineLimit(2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+
+      if book.chapterCount > 1 {
+        Text(chapterLine)
+          .font(SirenType.display(.title3, weight: .medium).italic())
+          .foregroundStyle(.white)
+          .lineLimit(2)
+          .padding(.top, 12)
+      }
+      if !timeLine.isEmpty {
+        Text(timeLine)
+          .font(.footnote)
+          .foregroundStyle(.white.opacity(0.75))
+          .monospacedDigit()
+          .padding(.top, book.chapterCount > 1 ? 0 : 12)
+      }
+
+      HStack(spacing: 14) {
+        Button(action: onResume) {
+          Label(isPlaying ? "Pause" : "Resume", systemImage: isPlaying ? "pause.fill" : "play.fill")
+            .font(SirenType.display(.headline))
+            .foregroundStyle(bandColor)
+            .lineLimit(1)
+            .fixedSize()
+            .padding(.horizontal, 20)
+            .frame(minHeight: 44)
+            .background(.white, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        Text("\(Int((book.progress * 100).rounded()))%")
+          .font(.subheadline.weight(.semibold))
+          .foregroundStyle(.white.opacity(0.75))
+          .monospacedDigit()
+          .accessibilityLabel("\(Int((book.progress * 100).rounded())) percent listened")
+      }
+      .padding(.top, 14)
+    }
+  }
+
+  /// "Chapter 14, The Spice Harvest", or just the title when it already names the chapter.
+  private var chapterLine: String {
+    let title = book.chapterTitle.trimmingCharacters(in: .whitespaces)
+    if title.isEmpty || title.allSatisfy(\.isNumber) { return "Chapter \(book.currentChapter)" }
+    if title.lowercased().hasPrefix("chapter") { return title }
+    return "Chapter \(book.currentChapter), \(title)"
+  }
+
+  private var timeLine: String {
+    var parts: [String] = []
+    if book.chapterCount > 1, !book.chapterRemaining.isEmpty {
+      parts.append("\(book.chapterRemaining) left in chapter")
+    }
+    if !book.timeLeft.isEmpty { parts.append("\(book.timeLeft) left in book") }
+    return parts.joined(separator: " · ")
+  }
+}
+
 /// The personal yearly goal: a slot per book, filled with the covers finished so far.
 struct SirenGoalCard: View {
   enum Unit { case books, hours }
