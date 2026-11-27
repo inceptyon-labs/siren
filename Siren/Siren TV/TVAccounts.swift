@@ -73,6 +73,7 @@ struct TVProfiles: View {
       await TVPlayer.shared.stop()
     }
     if server.id == account.serverID { TVTopShelf.clear() }
+    await Audiobookshelf.shared.authentication.revokeSignIn(server.id)  // SIREN: end it on the server
     Audiobookshelf.shared.authentication.logout(serverID: server.id)
     if Audiobookshelf.shared.authentication.server == nil,
       let next = Audiobookshelf.shared.authentication.servers.keys.sorted().first
@@ -88,7 +89,7 @@ struct TVProfiles: View {
 struct TVSignIn: View {
   var onDone: (() -> Void)?
 
-  @State private var address = "http://"
+  @State private var address = "https://"  // SIREN: as on iPhone; type http:// for a plain server
   @State private var username = ""
   @State private var password = ""
   @State private var isSigningIn = false
@@ -141,7 +142,7 @@ struct TVSignIn: View {
     isSigningIn = true
     defer { isSigningIn = false }
     var server = address.trimmingCharacters(in: .whitespacesAndNewlines)
-    if !server.contains("://") { server = "http://" + server }
+    if !server.contains("://") { server = "https://" + server }  // SIREN
     while server.hasSuffix("/") { server.removeLast() }
     do {
       let id = try await Audiobookshelf.shared.authentication.login(

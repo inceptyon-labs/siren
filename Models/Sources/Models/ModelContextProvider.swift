@@ -76,15 +76,24 @@ public final class ModelContextProvider {
       AppLogger.persistence.error(
         "Failed to create persistent model container for server \(serverID): \(error)"
       )
-      AppLogger.persistence.info("Clearing data and creating fresh container...")
-
-      let fileExtensions = ["", "-shm", "-wal"]
-      for ext in fileExtensions {
-        let fileURL = URL(fileURLWithPath: dbURL.path + ext)
-        try? FileManager.default.removeItem(at: fileURL)
+      // SIREN: move the unreadable store aside instead of deleting it; it can hold progress and
+      // bookmarks that never reached the server
+      let stamp = Int(Date().timeIntervalSince1970)
+      let backup = dbURL.deletingLastPathComponent().appending(path: "Unreadable-\(stamp)")
+      do {
+        try FileManager.default.createDirectory(at: backup, withIntermediateDirectories: true)
+        for ext in ["", "-shm", "-wal"] {
+          let fileURL = URL(fileURLWithPath: dbURL.path + ext)
+          guard FileManager.default.fileExists(atPath: fileURL.path) else { continue }
+          try FileManager.default.moveItem(at: fileURL, to: backup.appending(path: fileURL.lastPathComponent))
+        }
+      } catch {
+        // Can't keep a copy, so leave the store alone and let the caller see the error.
+        AppLogger.persistence.error("Couldn't move the unreadable store aside: \(error)")
+        throw error
       }
 
-      AppLogger.persistence.info("Cleared existing database files")
+      AppLogger.persistence.info("Moved the unreadable store to \(backup.lastPathComponent)")
 
       do {
         let schema = Schema(versionedSchema: AudiobookshelfSchema.self)

@@ -71,8 +71,8 @@ actor CredentialsActor {
     if case NetworkError.httpError(let statusCode, _) = error,
       statusCode == 401 || statusCode == 403
     {
-      consecutiveFailures = 0
-      nextRetryAt = nil
+      consecutiveFailures += 1
+      nextRetryAt = Date().addingTimeInterval(min(15 * 60, 60 * pow(2.0, Double(consecutiveFailures - 1))))
       return await MainActor.run { [weak server] () -> Credentials? in
         guard let server else { return nil }
         if case .bearer(_, _, _, .some(let legacyToken)) = server.token, !legacyToken.isEmpty {
@@ -80,8 +80,9 @@ actor CredentialsActor {
           Audiobookshelf.shared.authentication.updateToken(server.id, token: fallback)
           return fallback
         }
-        let cleared = Credentials.bearer(accessToken: "", refreshToken: "", expiresAt: 0, legacyToken: nil)
-        Audiobookshelf.shared.authentication.updateToken(server.id, token: cleared)
+        // SIREN: keep the refresh token. A 401 or 403 can come from a proxy in front of the
+        // server (an expired access policy), and wiping the sign-in then can't be undone. The
+        // server shows as signed out, and refresh is tried again after the backoff set above.
         server.status = .authenticationError
         return nil
       }

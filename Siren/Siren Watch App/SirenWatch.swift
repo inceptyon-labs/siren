@@ -8,7 +8,8 @@ struct SirenWatch: App {
   @WKApplicationDelegateAdaptor private var appDelegate: AppDelegate
 
   init() {
-    ImagePipeline.shared = .watch(customHeaders: Audiobookshelf.shared.authentication.server?.customHeaders)
+    let server = Audiobookshelf.shared.authentication.server
+    ImagePipeline.shared = .watch(customHeaders: server?.customHeaders, hosts: ServerScopedDataLoader.hosts(of: server))
     _ = WatchConnectivityManager.shared
     DownloadManager.shared.start()
   }
@@ -24,7 +25,8 @@ extension ImagePipeline {
   // SIREN: Siren identifiers
   nonisolated private static let dataCache = try? DataCache(name: "com.inceptyon.siren.watch.images")
 
-  nonisolated static func watch(customHeaders: [String: String]?) -> ImagePipeline {
+  // SIREN: custom headers go only to the server's own hosts
+  nonisolated static func watch(customHeaders: [String: String]?, hosts: Set<String> = []) -> ImagePipeline {
     ImagePipeline {
       let config = URLSessionConfiguration.default
       config.timeoutIntervalForResource = 300
@@ -34,9 +36,12 @@ extension ImagePipeline {
       config.allowsExpensiveNetworkAccess = true
       config.allowsConstrainedNetworkAccess = true
       config.urlCache = nil
-      config.httpAdditionalHeaders = customHeaders
 
-      $0.dataLoader = DataLoader(configuration: config)
+      $0.dataLoader = ServerScopedDataLoader(
+        loader: DataLoader(configuration: config),
+        headers: customHeaders ?? [:],
+        hosts: hosts
+      )
       $0.dataCache = dataCache
     }
   }

@@ -32,6 +32,10 @@ struct ConnectionSharingPage: View {
           .onChange(of: model.includeCredentials) { _, _ in
             model.onIncludeCredentialsChanged()
           }
+        // SIREN: say what travels with them
+        Text("Credentials are your sign-in and any custom headers.")
+          .font(.footnote)
+          .foregroundStyle(.secondary)
 
         if model.includeCredentials, model.isCredentialsEphemeral {
           HStack(alignment: .center, spacing: 8) {

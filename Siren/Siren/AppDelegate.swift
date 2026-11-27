@@ -44,6 +44,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         AppLogger.general.error("Failed to switch database: \(error.localizedDescription)")
       }
       WatchConnectivityManager.shared.updateContext()
+      AudiobookIndexer.populate()  // SIREN: Spotlight and Siri show this profile's books only
     }
 
     Audiobookshelf.shared.authentication.onTokenUpdated = {

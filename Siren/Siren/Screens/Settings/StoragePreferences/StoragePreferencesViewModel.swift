@@ -75,22 +75,13 @@ final class StoragePreferencesViewModel: StoragePreferencesView.Model {
   }
 
   override func onRemoveDownload(bookID: String, serverID: String) {
+    guard !SirenProfiles.shared.isLockedAway(serverID) else { return }  // SIREN: Face ID profiles
     if serverID == Audiobookshelf.shared.authentication.server?.id {
       DownloadManager.shared.deleteDownload(for: bookID)
     } else {
-      guard
-        let appGroupURL = FileManager.default.containerURL(
-          forSecurityApplicationGroupIdentifier: "group.com.inceptyon.siren"  // SIREN: Siren identifiers
-        )
-      else { return }
-
-      let serverDir = appGroupURL.appendingPathComponent(serverID)
-      try? FileManager.default.removeItem(
-        at: serverDir.appendingPathComponent("audiobooks").appendingPathComponent(bookID)
-      )
-      try? FileManager.default.removeItem(
-        at: serverDir.appendingPathComponent("ebooks").appendingPathComponent(bookID)
-      )
+      // SIREN: the same safe folder names the downloads were saved under
+      try? FileManager.default.removeItem(at: DownloadManager.audiobookDirectory(serverID: serverID, bookID: bookID))
+      try? FileManager.default.removeItem(at: DownloadManager.ebookDirectory(serverID: serverID, bookID: bookID))
 
       if let context = try? ModelContextProvider.shared.context(for: serverID) {
         let predicate = #Predicate<LocalBook> { $0.bookID == bookID }
@@ -226,7 +217,8 @@ final class StoragePreferencesViewModel: StoragePreferencesView.Model {
 
     var result: [StoragePreferencesView.ServerDownloads] = []
 
-    for server in sortedServers {
+    // SIREN: a profile that asks for Face ID keeps its downloads out of this list
+    for server in sortedServers where !SirenProfiles.shared.isLockedAway(server.id) {
       let serverDir = appGroupURL.appendingPathComponent(server.id)
       let context = try? ModelContextProvider.shared.context(for: server.id)
 

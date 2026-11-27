@@ -30,7 +30,7 @@ public final class Audiobookshelf {
   private init() {
     setupNetworkService()
 
-    ImagePipeline.shared = .siren(customHeaders: authentication.server?.customHeaders)
+    ImagePipeline.shared = .siren(for: authentication.server)  // SIREN: headers to the server's hosts only
   }
 
   public func logout(serverID: String) {

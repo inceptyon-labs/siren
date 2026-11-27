@@ -7,6 +7,8 @@ class DeepLinkManager: ObservableObject {
   static let shared = DeepLinkManager()
 
   @Published var pendingExportConnection: ExportConnection?
+  /// A link that signs in by itself, waiting for the person to say yes.
+  @Published var pendingSignIn: ExportConnection?  // SIREN: confirm before a link signs in
   @Published private(set) var isImportingConnection = false
 
   private init() {}
@@ -31,6 +33,7 @@ class DeepLinkManager: ObservableObject {
 
   private func handlePlayDeepLink(_ components: URLComponents) {
     let bookID = String(components.path.dropFirst())
+    guard bookID.isSafePathComponent else { return }  // SIREN: an id, not a path (`../`)
     let playerManager = PlayerManager.shared
 
     Task {
@@ -40,6 +43,7 @@ class DeepLinkManager: ObservableObject {
 
   private func handleOpenDeepLink(_ components: URLComponents) {
     let bookID = String(components.path.dropFirst())
+    guard bookID.isSafePathComponent else { return }  // SIREN: an id, not a path (`../`)
     let playerManager = PlayerManager.shared
 
     Task {
@@ -53,6 +57,27 @@ class DeepLinkManager: ObservableObject {
       return
     }
 
+    // SIREN: a kids profile can't add sign-ins, and a link that carries one waits for a yes
+    if SirenProfiles.shared.isKidsActive {
+      Toast(error: "Leave the kids profile to add a sign-in").show()
+      return
+    }
+    if exportConnection.token != nil {
+      pendingSignIn = exportConnection
+      return
+    }
+
+    importConnection(exportConnection)
+  }
+
+  /// The person said yes to a link that signs in.
+  func confirmSignIn() {
+    guard let exportConnection = pendingSignIn else { return }
+    pendingSignIn = nil
+    importConnection(exportConnection)
+  }
+
+  private func importConnection(_ exportConnection: ExportConnection) {
     Toast(message: "Testing shared connection...").show()
     isImportingConnection = true
     Task {
@@ -62,6 +87,13 @@ class DeepLinkManager: ObservableObject {
   }
 
   private func validateAndImportConnection(_ exportConnection: ExportConnection) async {
+    // SIREN: a link without a sign-in only fills in the server; the person adds any headers it
+    // needs and signs in there
+    guard exportConnection.token != nil else {
+      pendingExportConnection = exportConnection
+      return
+    }
+
     do {
       _ = try await Audiobookshelf.shared.networkDiscovery.fetchServerStatus(
         serverURL: exportConnection.url,
@@ -130,7 +162,8 @@ extension DeepLinkManager {
 
     init?(_ connection: Connection, includeToken: Bool = false) {
       url = connection.serverURL
-      headers = connection.customHeaders
+      // SIREN: custom headers are often proxy secrets, so they travel only with the credentials
+      headers = includeToken ? connection.customHeaders : [:]
       alias = connection.alias
 
       if includeToken {
@@ -159,6 +192,22 @@ struct DeepLinkHandlerModifier: ViewModifier {
       }
       .sheet(item: $deepLinkManager.pendingExportConnection) { exportConnection in
         ServerListPage(model: ServerListModel(pendingExportConnection: exportConnection))
+      }
+      // SIREN: confirm before a link signs in
+      .alert(
+        "Sign In from This Link?",
+        isPresented: Binding(
+          get: { deepLinkManager.pendingSignIn != nil },
+          set: { if !$0 { deepLinkManager.pendingSignIn = nil } }
+        ),
+        presenting: deepLinkManager.pendingSignIn
+      ) { _ in
+        Button("Sign In") { deepLinkManager.confirmSignIn() }
+        Button("Cancel", role: .cancel) { deepLinkManager.pendingSignIn = nil }
+      } message: { connection in
+        Text(
+          "This link signs Siren in to \(connection.url.host() ?? connection.url.absoluteString) and switches to that sign-in. Only continue if you know who sent it."
+        )
       }
   }
 }

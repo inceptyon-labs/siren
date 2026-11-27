@@ -20,9 +20,13 @@ final class WatchLocalSessionStore {
   private(set) var sessions: [WatchLocalSession]
 
   private init() {
-    guard let data = UserDefaults.standard.data(forKey: sessionsKey),
-      let sessions = try? JSONDecoder().decode([WatchLocalSession].self, from: data)
-    else {
+    guard let data = UserDefaults.standard.data(forKey: sessionsKey) else {
+      self.sessions = []
+      return
+    }
+    guard let sessions = try? JSONDecoder().decode([WatchLocalSession].self, from: data) else {
+      // SIREN: keep unsent listening that couldn't be read instead of overwriting it
+      UserDefaults.standard.set(data, forKey: sessionsKey + ".unreadable")
       self.sessions = []
       return
     }

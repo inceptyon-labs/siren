@@ -107,6 +107,7 @@ final class EbookReaderViewModel: EbookReaderView.Model {
       .sink { [weak self] _ in
         self?.catchUpCheck?.cancel()
         self?.suspendReadAlong()
+        self?.flushUnsyncedProgress()  // SIREN: the app may not come back to send it
       }
       .store(in: &cancellables)
 
@@ -158,11 +159,15 @@ final class EbookReaderViewModel: EbookReaderView.Model {
     }
   }
 
+  /// Sends the position the throttle held back, or that failed to send.
+  private func flushUnsyncedProgress() {
+    guard hasUnsyncedProgress else { return }
+    lastProgressUpdate = nil
+    syncProgressToServer(progress)
+  }
+
   override func onDisappear() {
-    if hasUnsyncedProgress {
-      lastProgressUpdate = nil
-      syncProgressToServer(progress)
-    }
+    flushUnsyncedProgress()
     catchUpCheck?.cancel()
     mediaOverlayRetargetTask?.cancel()
     stopFollowingMediaOverlay()
@@ -810,6 +815,7 @@ final class EbookReaderViewModel: EbookReaderView.Model {
         )
         AppLogger.viewModel.debug("Synced ebook progress: \(progress)")
       } catch {
+        hasUnsyncedProgress = true  // SIREN: try again with the next update or on leaving
         AppLogger.viewModel.error("Failed to sync ebook progress: \(error)")
       }
     }

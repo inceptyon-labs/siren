@@ -54,12 +54,16 @@ public struct RequestsAccount: Sendable, Equatable {
     return String(data: data, encoding: .utf8)
   }
 
+  /// Updates the stored token in place, so a failed write leaves the old one.
   private static func writeToken(_ token: String, profileID: String) throws {
-    SecItemDelete(query(profileID) as CFDictionary)
-    var item = query(profileID)
-    item[kSecValueData as String] = Data(token.utf8)
-    item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-    let status = SecItemAdd(item as CFDictionary, nil)
+    let attributes: [String: Any] = [
+      kSecValueData as String: Data(token.utf8),
+      kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+    ]
+    var status = SecItemUpdate(query(profileID) as CFDictionary, attributes as CFDictionary)
+    if status == errSecItemNotFound {
+      status = SecItemAdd(query(profileID).merging(attributes) { $1 } as CFDictionary, nil)
+    }
     guard status == errSecSuccess else {
       throw NSError(domain: NSOSStatusErrorDomain, code: Int(status))
     }

@@ -242,7 +242,11 @@ final class NetworkService: @unchecked Sendable {
           "HTTP \(httpResponse.statusCode) error for \(urlRequest.httpMethod ?? "GET") \(urlRequest.url?.absoluteString ?? "unknown"). Response body: \(responseBody)"
         )
 
-        if httpResponse.statusCode == 401, let server, await server.canAttemptRefresh {
+        // SIREN: once a refresh has been refused, stay signed out rather than flipping back to a
+        // connection error on every request until the next refresh try
+        if httpResponse.statusCode == 401, let server, await server.canAttemptRefresh,
+          await server.status != .authenticationError
+        {
           await MainActor.run {
             server.expireAccessToken()
             server.status = .connectionError
@@ -322,6 +326,11 @@ final class NetworkService: @unchecked Sendable {
 
     guard let baseURL = baseURL ?? serverURL else {
       throw NetworkError.invalidResponse
+    }
+
+    // SIREN: ids go into paths as one segment each; `.` or `..` would aim the request elsewhere
+    if request.path.split(separator: "/").contains(where: { $0 == "." || $0 == ".." }) {
+      throw URLError(.badURL)
     }
 
     var url = baseURL.appendingPathComponent(request.path)
@@ -427,6 +436,18 @@ extension String {
       let redactedHost = URL.redactedHost(for: host)
       result.replaceSubrange(fullRange, with: "\(scheme)://\(redactedHost)")
     }
-    return result
+    return result.redactingCredentialQueryItems
+  }
+
+  // SIREN: tokens also travel as query items (`?token=`), and an error's text carries its URL
+  private static let credentialQueryItem = try? NSRegularExpression(
+    pattern: #"([?&](?:token|code|code_verifier|state)=)[^&\s"'<>,;)}\]]+"#,
+    options: [.caseInsensitive]
+  )
+
+  private var redactingCredentialQueryItems: String {
+    guard let regex = Self.credentialQueryItem else { return self }
+    let range = NSRange(startIndex..<endIndex, in: self)
+    return regex.stringByReplacingMatches(in: self, range: range, withTemplate: "$1private")
   }
 }

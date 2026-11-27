@@ -12,6 +12,9 @@ public final class SmartPlaylists {
   public private(set) var all: [SmartPlaylist] = []
 
   private static let key = "siren.smartPlaylists"
+  /// Deleted playlist IDs and when, so a device that still has one doesn't bring it back.
+  private static let deletedKey = "siren.smartPlaylists.deleted"  // SIREN
+  private static let deletedKeepFor: TimeInterval = 90 * 24 * 3600
   @ObservationIgnored private let store = NSUbiquitousKeyValueStore.default
   @ObservationIgnored private var lastSync: (library: String, at: Date)?
   @ObservationIgnored private var isSyncing = false
@@ -25,8 +28,11 @@ public final class SmartPlaylists {
       forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
       object: store,
       queue: .main
-    ) { _ in
-      MainActor.assumeIsolated { SmartPlaylists.shared.load() }
+    ) { notification in
+      // SIREN: another device's list merges with this one's; a different iCloud account replaces it
+      let reason = notification.userInfo?[NSUbiquitousKeyValueStoreChangeReasonKey] as? Int
+      let isAccountChange = reason == NSUbiquitousKeyValueStoreAccountChange
+      MainActor.assumeIsolated { SmartPlaylists.shared.load(merging: !isAccountChange) }
     }
     store.synchronize()
   }
@@ -36,6 +42,8 @@ public final class SmartPlaylists {
   }
 
   public func save(_ playlist: SmartPlaylist) {
+    var playlist = playlist
+    playlist.updatedAt = .now  // SIREN: for merging with other devices
     if let index = all.firstIndex(where: { $0.id == playlist.id }) {
       all[index] = playlist
     } else {
@@ -46,10 +54,21 @@ public final class SmartPlaylists {
 
   public func delete(_ id: UUID) {
     all.removeAll { $0.id == id }
+    var deleted = storedDeletions()
+    deleted[id.uuidString] = Date.now.timeIntervalSince1970
+    store.set(deleted, forKey: Self.deletedKey)
     write()
   }
 
-  private func load() {
+  private func storedDeletions() -> [String: Double] {
+    let cutoff = Date.now.timeIntervalSince1970 - Self.deletedKeepFor
+    let deleted = store.dictionary(forKey: Self.deletedKey) as? [String: Double] ?? [:]
+    return deleted.filter { $0.value > cutoff }
+  }
+
+  /// Reads the list from iCloud. When merging, a playlist only this device has stays, the newer
+  /// copy of one both have wins, and one deleted on either device stays deleted.
+  private func load(merging: Bool = false) {
     guard let data = store.data(forKey: Self.key),
       let elements = try? JSONSerialization.jsonObject(with: data) as? [Any]
     else { return }
@@ -64,8 +83,28 @@ public final class SmartPlaylists {
         kept.append(element)
       }
     }
-    all = read
     unreadable = kept
+    guard merging else {
+      all = read
+      return
+    }
+
+    let deleted = storedDeletions()
+    func isDeleted(_ playlist: SmartPlaylist) -> Bool {
+      guard let at = deleted[playlist.id.uuidString] else { return false }
+      return at >= (playlist.updatedAt ?? .distantPast).timeIntervalSince1970
+    }
+    var merged = read
+    for local in all {
+      if let index = merged.firstIndex(where: { $0.id == local.id }) {
+        if (local.updatedAt ?? .distantPast) > (merged[index].updatedAt ?? .distantPast) { merged[index] = local }
+      } else {
+        merged.append(local)
+      }
+    }
+    merged.removeAll(where: isDeleted)
+    all = merged
+    if merged != read { write() }
   }
 
   private func write() {

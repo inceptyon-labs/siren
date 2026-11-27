@@ -13,8 +13,16 @@ public final class AuthenticationService: ObservableObject {
     static let activeServerID = "audiobookshelf_active_server_id"
   }
 
+  /// False when the stored sign-ins exist but couldn't be read this launch (a locked Keychain):
+  /// saving then would replace them with only what's in memory.
+  private var canSaveConnections = true  // SIREN
+
   private var connections: [String: Connection] = [:] {
     didSet {
+      guard canSaveConnections else {
+        AppLogger.authentication.error("Stored sign-ins couldn't be read this launch; not overwriting them")
+        return
+      }
       if !connections.isEmpty {
         guard let data = try? JSONEncoder().encode(connections) else { return }
         try? keychain.set(data, forKey: Keys.connections)
@@ -46,15 +54,26 @@ public final class AuthenticationService: ObservableObject {
   init(audiobookshelf: Audiobookshelf) {
     self.audiobookshelf = audiobookshelf
 
-    if let data = try? keychain.data(forKey: Keys.connections),
-      let decoded = try? JSONDecoder().decode([String: Connection].self, from: data)
-    {
-      self.connections = decoded
-      self.servers = decoded.mapValues { Server(connection: $0) }
+    // SIREN: "none stored" is the only read failure that means empty
+    do {
+      let data = try keychain.data(forKey: Keys.connections)
+      if let decoded = try? JSONDecoder().decode([String: Connection].self, from: data) {
+        self.connections = decoded
+        self.servers = decoded.mapValues { Server(connection: $0) }
 
-      if let activeServerID = UserDefaults.standard.string(forKey: Keys.activeServerID) {
-        self.server = servers[activeServerID]
+        if let activeServerID = UserDefaults.standard.string(forKey: Keys.activeServerID) {
+          self.server = servers[activeServerID]
+        }
+      } else {
+        // A list this version can't decode: keep a copy before any new sign-in replaces it.
+        try? keychain.set(data, forKey: Keys.connections + ".unreadable")
+        AppLogger.authentication.error("Stored sign-ins couldn't be decoded; kept a copy")
       }
+    } catch let error as SimpleKeychainError where error == .itemNotFound {
+      // No sign-ins yet.
+    } catch {
+      canSaveConnections = false
+      AppLogger.authentication.error("Couldn't read stored sign-ins: \(error.localizedDescription)")
     }
 
     refreshRedactedHosts()
@@ -115,7 +134,7 @@ public final class AuthenticationService: ObservableObject {
   ) async throws -> String {
     AppLogger.authentication.info("loginWithOIDC called for server: \(serverURL)")
     AppLogger.authentication.debug(
-      "Request parameters - code length: \(code.count), verifier length: \(verifier.count), state: \(state ?? "nil"), cookies: \(cookies.count), custom headers: \(customHeaders.count)"
+      "Request parameters - code length: \(code.count), verifier length: \(verifier.count), state present: \(state != nil), cookies: \(cookies.count), custom headers: \(customHeaders.count)"
     )
 
     guard let baseURL = URL(string: serverURL) else {
@@ -185,7 +204,7 @@ public final class AuthenticationService: ObservableObject {
       throw Audiobookshelf.AudiobookshelfError.networkError("Server not found")
     }
     server = newServer
-    ImagePipeline.shared = .siren(customHeaders: newServer.customHeaders)
+    ImagePipeline.shared = .siren(for: newServer)  // SIREN: headers to the server's hosts only
   }
 
   public func restoreConnection(_ connection: Connection) {
@@ -219,6 +238,9 @@ public final class AuthenticationService: ObservableObject {
     server.alternativeURL = url
     connections[serverID] = Connection(server)
     refreshRedactedHosts()
+    if self.server?.id == serverID {
+      ImagePipeline.shared = .siren(for: server)  // SIREN: the image headers follow the hosts
+    }
   }
 
   public func setUsingAlternativeURL(_ serverID: String, isUsing: Bool) {
@@ -248,7 +270,7 @@ public final class AuthenticationService: ObservableObject {
     server.customHeaders = customHeaders
 
     if self.server?.id == serverID {
-      ImagePipeline.shared = .siren(customHeaders: customHeaders)
+      ImagePipeline.shared = .siren(for: server)  // SIREN: headers to the server's hosts only
     }
 
     var allConnections = connections
@@ -323,6 +345,18 @@ public final class AuthenticationService: ObservableObject {
 
       return newConnection.id
     }
+  }
+
+  /// Asks the server to end this sign-in (`POST /logout`), so its refresh token stops working.
+  /// Best effort: an API key, or a server that can't be reached, stays signed in on the server.
+  public func revokeSignIn(_ serverID: String) async {  // SIREN
+    guard let server = servers[serverID],
+      case .bearer(_, let refreshToken, _, _) = server.token, !refreshToken.isEmpty
+    else { return }
+    var headers = server.customHeaders
+    headers["x-refresh-token"] = refreshToken
+    let request = NetworkRequest<Data>(path: "/logout", method: .post, headers: headers, timeout: 10)
+    _ = try? await NetworkService(server: server).send(request)
   }
 
   public func logout(serverID: String) {

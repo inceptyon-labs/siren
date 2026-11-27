@@ -103,6 +103,7 @@ struct ServerView: View {
       Text("Enter the port number to scan for Audiobookshelf servers on your local network.")
     }
     .onAppear(perform: model.onAppear)
+    .sirenGrownUpsOnly()  // SIREN: kids profile
   }
 
   @ViewBuilder
@@ -243,7 +244,10 @@ struct ServerView: View {
         }
         Button("Cancel", role: .cancel) {}
       } message: {
-        Text("Logging out will remove all downloads for this connection.")
+        // SIREN: say what goes
+        Text(
+          "Logging out removes this sign-in from this device, with its downloads and any listening that hasn't reached the server yet. Siren tries to send that first."
+        )
       }
     }
     .listRowBackground(theme.colors.background.card)
@@ -317,6 +321,9 @@ extension ServerView {
     var serverVersion: String?
     var canExportConnection: Bool
     var connectionSharingModel: ConnectionSharingPage.Model?
+
+    /// The profile this screen shows, nil while adding one.
+    var profileID: String? { nil }  // SIREN: Face ID for locked profiles
 
     var isTypingScheme: Bool {
       let lowercased = serverURL.lowercased()

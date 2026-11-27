@@ -596,9 +596,11 @@ extension BookPlayerModel {
   }
 
   func closeSession() {
+    // SIREN: take the session now; callers clear the manager's session before this task runs
+    let session = sessionManager.current
     Task {
       let isDownloaded = item?.isDownloaded ?? false
-      try? await sessionManager.closeSession(isDownloaded: isDownloaded)
+      try? await sessionManager.closeSession(isDownloaded: isDownloaded, session: session)
     }
   }
 }

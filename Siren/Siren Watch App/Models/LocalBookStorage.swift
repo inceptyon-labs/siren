@@ -7,19 +7,28 @@ final class LocalBookStorage: ObservableObject {
   private let booksKey = "local_books"
 
   @Published private(set) var books: [WatchBook]
+  /// The saved list didn't decode, so the downloads on disk can't be matched to books.
+  private(set) var couldNotRead = false
 
   private init() {
-    guard let data = UserDefaults.standard.data(forKey: booksKey),
-      let books = try? JSONDecoder().decode([WatchBook].self, from: data)
-    else {
+    guard let data = UserDefaults.standard.data(forKey: booksKey) else {
       self.books = []
+      return
+    }
+    guard let books = try? JSONDecoder().decode([WatchBook].self, from: data) else {
+      // SIREN: keep what couldn't be read instead of overwriting it with an empty list
+      UserDefaults.standard.set(data, forKey: booksKey + ".unreadable")
+      self.books = []
+      couldNotRead = true
       return
     }
     self.books = books
   }
 
   func saveBooks(_ books: [WatchBook]) {
-    let data = try? JSONEncoder().encode(books)
+    // SIREN: the saved copy leaves out sign-in tokens; a download that then gets a 401 fetches
+    // fresh track URLs from the phone
+    let data = try? JSONEncoder().encode(books.map(\.withoutURLTokens))
     UserDefaults.standard.set(data, forKey: booksKey)
     self.books = books
   }
@@ -53,5 +62,24 @@ final class LocalBookStorage: ObservableObject {
       updatedBooks[index].currentTime = currentTime
       saveBooks(updatedBooks)
     }
+  }
+}
+
+extension WatchBook {
+  /// This book with any `token` query item taken out of its track URLs.
+  fileprivate var withoutURLTokens: WatchBook {
+    var copy = self
+    copy.tracks = tracks.map { track in
+      var track = track
+      if let url = track.url, var components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+        components.queryItems?.contains(where: { $0.name == "token" }) == true
+      {
+        components.queryItems?.removeAll { $0.name == "token" }
+        if components.queryItems?.isEmpty == true { components.queryItems = nil }
+        track.url = components.url ?? url
+      }
+      return track
+    }
+    return copy
   }
 }

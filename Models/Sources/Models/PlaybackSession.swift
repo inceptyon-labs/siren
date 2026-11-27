@@ -83,10 +83,12 @@ extension PlaybackSession {
     return try context.fetch(descriptor)
   }
 
+  /// Sessions holding listening time the server hasn't got: downloaded books' sessions, and
+  /// streamed ones the player left before their last sync went through.
   public static func fetchUnsynced() throws -> [PlaybackSession] {
     let context = ModelContextProvider.shared.context
     let predicate = #Predicate<PlaybackSession> { session in
-      session.pendingListeningTime > 0 && session.baseURL == nil
+      session.pendingListeningTime > 0  // SIREN: streamed sessions too
     }
     let descriptor = FetchDescriptor<PlaybackSession>(
       predicate: predicate,

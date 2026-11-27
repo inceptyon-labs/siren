@@ -3,6 +3,7 @@ import AuthenticationServices
 import CoreImage.CIFilterBuiltins
 import Foundation
 import Logging
+import SirenKit
 import SwiftUI
 import UIKit
 
@@ -13,6 +14,8 @@ final class ServerViewModel: ServerView.Model {
   private var libraryData: [API.Library] = []
   private var server: Server?
   private var pendingConnectionID: String?
+
+  override var profileID: String? { server?.id }  // SIREN: Face ID for locked profiles
 
   private final class NewServerAuthViewModel: AuthenticationView.Model {
     weak var parent: ServerViewModel?
@@ -451,14 +454,24 @@ final class ServerViewModel: ServerView.Model {
 
   override func onLogoutTapped() {
     guard let serverID = server?.id else { return }
+    Task { await logOut(serverID) }
+  }
 
+  private func logOut(_ serverID: String) async {
+    // SIREN: send this sign-in's listening before its database goes, and end it on the server
     if audiobookshelf.authentication.server?.id == serverID {
+      (playerManager.current as? BookPlayerModel)?.stopPlayer()
+      try? await SessionManager.shared.closeSession()
+      await SessionManager.shared.sendPendingSessions()
       playerManager.current = nil
       playerManager.clearQueue()
     }
+    await audiobookshelf.authentication.revokeSignIn(serverID)
+    RequestsAccount.remove(profileID: serverID)
 
     audiobookshelf.logout(serverID: serverID)
     WatchConnectivityManager.shared.updateContext()
+    AudiobookIndexer.populate()  // SIREN: drop this sign-in's books from Spotlight and Siri
     server = nil
 
     let newAuthModel = NewServerAuthViewModel(parent: self)

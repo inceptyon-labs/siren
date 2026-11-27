@@ -23,24 +23,25 @@ final class DownloadManager: NSObject, ObservableObject {
     return url
   }()
 
+  // SIREN: ids come from the server, so each is reduced to one safe folder name (UUIDs pass unchanged)
   nonisolated static func audiobookPath(serverID: String, bookID: String) -> String {
-    "\(serverID)/audiobooks/\(bookID)"
+    "\(serverID)/audiobooks/\(bookID.safePathComponent)"
   }
 
   nonisolated static func ebookPath(serverID: String, bookID: String) -> String {
-    "\(serverID)/ebooks/\(bookID)"
+    "\(serverID)/ebooks/\(bookID.safePathComponent)"
   }
 
   nonisolated static func narrationPath(serverID: String, bookID: String) -> String {
-    "\(serverID)/narration/\(bookID)"
+    "\(serverID)/narration/\(bookID.safePathComponent)"
   }
 
   nonisolated static func episodePath(serverID: String, podcastID: String, episodeID: String) -> String {
-    "\(serverID)/episodes/\(podcastID)/\(episodeID)"
+    "\(serverID)/episodes/\(podcastID.safePathComponent)/\(episodeID.safePathComponent)"
   }
 
   nonisolated static func coverPath(serverID: String, itemID: String) -> String {
-    "\(serverID)/covers/\(itemID).jpg"
+    "\(serverID)/covers/\(itemID.safePathComponent).jpg"
   }
 
   nonisolated static func audiobookDirectory(serverID: String, bookID: String) -> URL {
@@ -448,6 +449,14 @@ final class DownloadManager: NSObject, ObservableObject {
     size: Int64
   ) {
     if kind == .episode, podcastID == nil { return }
+
+    // SIREN: an id that isn't a plain name (a slash, `..`) can only come from a broken or hostile
+    // server; its files would never land where the app looks for them.
+    guard itemID.isSafePathComponent, podcastID?.isSafePathComponent ?? true else {
+      AppLogger.download.error("Refusing download with an unusable item id")
+      Toast(error: "This item can't be downloaded").show()
+      return
+    }
 
     var kind = kind
     if let existing = try? DownloadRequest.fetch(itemID: itemID), existing.kind != kind {
@@ -1134,10 +1143,12 @@ private final class DownloadSessionDelegate: NSObject, URLSessionDownloadDelegat
       at: destination.deletingLastPathComponent(),
       withIntermediateDirectories: true
     )
+    // SIREN: swap in one step, so a failed move leaves the old file
     if FileManager.default.fileExists(atPath: destination.path) {
-      try FileManager.default.removeItem(at: destination)
+      _ = try FileManager.default.replaceItemAt(destination, withItemAt: location)
+    } else {
+      try FileManager.default.moveItem(at: location, to: destination)
     }
-    try FileManager.default.moveItem(at: location, to: destination)
   }
 
   nonisolated func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
@@ -1405,13 +1416,11 @@ extension DownloadManager {
     var totalBytes: Int64 = 0
 
     if wantsEbook, let ebookURL = book.ebookURL {
-      let ext: String
-      if let ebookFileExt = book.media.ebookFile?.metadata.ext {
-        ext = ebookFileExt
-      } else {
-        let pathExt = ebookURL.pathExtension
-        ext = pathExt.isEmpty ? ".epub" : ".\(pathExt)"
-      }
+      // SIREN: the extension comes from the server, so only a plain one is used
+      let ext =
+        book.media.ebookFile?.metadata.ext.safeFileExtension
+        ?? ebookURL.pathExtension.safeFileExtension
+        ?? ".epub"
 
       let directoryPath = DownloadManager.ebookPath(serverID: context.serverID, bookID: itemID)
       try prepareDownloadDirectory(
@@ -1422,7 +1431,7 @@ extension DownloadManager {
       files.append(
         makeFile(
           url: ebookURL,
-          relativePath: "\(directoryPath)/\(itemID)\(ext)",
+          relativePath: "\(directoryPath)/\(itemID.safePathComponent)\(ext)",
           expectedSize: expectedSize,
           credentials: context.credentials
         )
@@ -1543,6 +1552,6 @@ extension AudioTrack {
     default: break
     }
 
-    return metadata?.ext ?? ".mp3"
+    return metadata?.ext?.safeFileExtension ?? ".mp3"  // SIREN: server text, only a plain extension
   }
 }

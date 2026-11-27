@@ -31,6 +31,11 @@ final class SirenProfiles {
   private var verifiedID: String?
   private(set) var locked: Set<String>
   private(set) var kids: Set<String>
+  /// When a grown-up last unlocked the settings and sign-in screens on a kids profile.
+  private var grownUpUnlockedAt: Date?
+  /// When the app last went to the background; a locked profile asks again after a while away.
+  @ObservationIgnored private var backgroundedAt: Date?
+  private static let relockAfter: TimeInterval = 5 * 60
 
   private init() {
     let defaults = UserDefaults.standard
@@ -43,6 +48,24 @@ final class SirenProfiles {
       verifiedID = from.isEmpty ? nil : from
       // After init: the cover's view reads `shared`, which isn't set until init returns.
       Task { @MainActor in self.verify() }
+    } else if let activeID, locked.contains(activeID) {
+      // SIREN: opening Siren on a locked profile asks too, not only switching to it
+      verifiedID = nil
+      Task { @MainActor in self.verify() }
+    }
+    NotificationCenter.default.addObserver(
+      forName: UIApplication.didEnterBackgroundNotification,
+      object: nil,
+      queue: .main
+    ) { _ in
+      MainActor.assumeIsolated { SirenProfiles.shared.backgroundedAt = .now }
+    }
+    NotificationCenter.default.addObserver(
+      forName: UIApplication.willEnterForegroundNotification,
+      object: nil,
+      queue: .main
+    ) { _ in
+      MainActor.assumeIsolated { SirenProfiles.shared.relockIfAway() }
     }
     // Every switch lands here, including ones made in the server list or by an invite link,
     // so Face ID and the kids lock can't be skipped by switching another way.
@@ -56,6 +79,7 @@ final class SirenProfiles {
   private func didSwitch(to id: String) {
     let from = activeID
     activeID = id
+    grownUpUnlockedAt = nil
     if approvedSwitch == id {
       approvedSwitch = nil
       if !isVerifying { verifiedID = id }
@@ -89,6 +113,16 @@ final class SirenProfiles {
         needsUnlock = true
       }
     }
+  }
+
+  /// Back after a while on a locked profile: Face ID again before the app shows.
+  private func relockIfAway() {
+    defer { backgroundedAt = nil }
+    guard let backgroundedAt, Date.now.timeIntervalSince(backgroundedAt) >= Self.relockAfter,
+      let activeID, locked.contains(activeID), !isVerifying
+    else { return }
+    verifiedID = nil
+    verify()
   }
 
   func unlock() {
@@ -126,6 +160,30 @@ final class SirenProfiles {
   }
 
   var isKidsActive: Bool { activeID.map(kids.contains) ?? false }
+
+  /// Settings and sign-in screens are closed on a kids profile, for five minutes after Face ID.
+  var areGrownUpScreensOpen: Bool {
+    guard isKidsActive else { return true }
+    return grownUpUnlockedAt.map { Date.now.timeIntervalSince($0) < 300 } ?? false
+  }
+
+  func unlockGrownUpScreens() async {
+    guard await Self.authenticate(reason: String(localized: "Open settings")) else { return }
+    grownUpUnlockedAt = .now
+  }
+
+  /// A profile other than this one that asks for Face ID: its sign-in, headers and downloads stay
+  /// out of reach from here.
+  func isLockedAway(_ id: String) -> Bool {
+    id != activeID && locked.contains(id)
+  }
+
+  /// Face ID before showing or changing another profile's sign-in, when that profile asks for it.
+  func mayOpen(_ id: String?) async -> Bool {
+    guard let id, isLockedAway(id) else { return true }
+    let name = profiles.first { $0.id == id }?.name ?? ""
+    return await Self.authenticate(reason: String(localized: "Open \(name)'s sign-in"))
+  }
 
   var profiles: [Profile] {
     Audiobookshelf.shared.authentication.servers.values
@@ -201,7 +259,7 @@ final class SirenProfiles {
   }
 
   /// Face ID, Touch ID or the passcode. True when the phone has none set up: nothing to check.
-  private static func authenticate(reason: String) async -> Bool {
+  static func authenticate(reason: String) async -> Bool {
     let context = LAContext()
     var error: NSError?
     guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else { return true }
@@ -279,7 +337,7 @@ struct SirenProfilesView: View {
           .listRowBackground(SirenTheme.raised)
       } footer: {
         Text(
-          "Ask for Face ID: switching to that profile needs Face ID or the passcode. Kids Profile: it opens the assisted player, and switching away needs Face ID or the passcode. Choose what kids can see in Audiobookshelf, with the \"kids\" tag."
+          "Ask for Face ID: switching to that profile, opening Siren on it, or coming back after five minutes away needs Face ID or the passcode. Kids Profile: it opens the assisted player, and switching away or opening settings needs Face ID or the passcode. Choose what kids can see in Audiobookshelf, with the \"kids\" tag."
         )
       }
     }
@@ -291,5 +349,41 @@ struct SirenProfilesView: View {
       ServerListPage(model: ServerListModel())
         .displaySheetScaled()
     }
+  }
+}
+
+/// Covers a screen a kids profile shouldn't reach (settings, sign-ins, sharing) until a grown-up
+/// passes Face ID or the passcode. On any other profile it shows the screen as it is.
+struct SirenGrownUpsOnly: ViewModifier {
+  @State private var profiles = SirenProfiles.shared
+  @Environment(\.dismiss) private var dismiss
+
+  func body(content: Content) -> some View {
+    if profiles.areGrownUpScreensOpen {
+      content
+    } else {
+      VStack(spacing: 20) {
+        Image(systemName: "lock.fill")
+          .font(.largeTitle)
+          .foregroundStyle(SirenTheme.secondary)
+          .accessibilityHidden(true)
+        Text("Ask a grown-up to open this.")
+          .font(.subheadline)
+          .foregroundStyle(SirenTheme.secondary)
+        Button("Unlock") { Task { await profiles.unlockGrownUpScreens() } }
+          .buttonStyle(.borderedProminent)
+          .tint(SirenTheme.tint)
+        Button("Close") { dismiss() }
+          .foregroundStyle(SirenTheme.secondary)
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .background(SirenTheme.ground.ignoresSafeArea())
+    }
+  }
+}
+
+extension View {
+  func sirenGrownUpsOnly() -> some View {
+    modifier(SirenGrownUpsOnly())
   }
 }

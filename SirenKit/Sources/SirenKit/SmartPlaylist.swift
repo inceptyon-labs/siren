@@ -11,6 +11,9 @@ public struct SmartPlaylist: Codable, Identifiable, Hashable, Sendable {
   public var sort: Sort = .recentlyAdded
   /// At most this many books; nil for all.
   public var limit: Int?
+  /// When it was last saved, so two devices' edits merge instead of the later list replacing
+  /// the earlier one. Nil for playlists saved before this was kept.
+  public var updatedAt: Date?  // SIREN
 
   public init(name: String, rules: [Rule] = [], sort: Sort = .recentlyAdded, limit: Int? = nil) {
     self.name = name

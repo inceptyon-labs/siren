@@ -70,6 +70,9 @@ extension Bookmark {
     return results
   }
 
+  /// How a bookmark waiting to be deleted on the server is remembered.
+  public static func pendingKey(bookID: String, time: Int) -> String { "\(bookID)|\(time)" }
+
   public static func fetch(bookID: String, time: Int) throws -> Bookmark? {
     let context = ModelContextProvider.shared.context
     let predicate = #Predicate<Bookmark> { bookmark in
@@ -99,17 +102,20 @@ extension Bookmark {
     try? context.save()
   }
 
-  public static func syncFromAPI(userData: User) throws {
+  /// Takes in the server's bookmarks. A local one with a change not sent yet keeps it, and one
+  /// deleted here but not yet on the server (`deleted`, keys from `pendingKey`) stays deleted.
+  public static func syncFromAPI(userData: User, deleted: Set<String> = []) throws {
     let context = ModelContextProvider.shared.context
 
     for apiBookmark in userData.bookmarks {
       let remote = Bookmark(from: apiBookmark)
 
       if let local = try Bookmark.fetch(bookID: apiBookmark.bookID, time: Int(apiBookmark.time)) {
+        // SIREN: a pending or failed edit is the newer copy
+        guard local.status == .synced else { continue }
         local.title = remote.title
         local.createdAt = remote.createdAt
-        local.status = .synced
-      } else {
+      } else if !deleted.contains(pendingKey(bookID: remote.bookID, time: remote.time)) {
         context.insert(remote)
       }
     }

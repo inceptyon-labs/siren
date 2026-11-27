@@ -24,11 +24,17 @@ final class WatchBookmarkStore {
   private let bookmarksKey = "bookmarks"
 
   private var bookmarksByBook: [String: [WatchBookmark]]
+  /// When each bookmark was added here, so one the phone hasn't saved yet survives a merge.
+  private var addedAt: [String: Date] = [:]  // SIREN
 
   private init() {
-    guard let data = UserDefaults.standard.data(forKey: bookmarksKey),
-      let bookmarksByBook = try? JSONDecoder().decode([String: [WatchBookmark]].self, from: data)
-    else {
+    guard let data = UserDefaults.standard.data(forKey: bookmarksKey) else {
+      self.bookmarksByBook = [:]
+      return
+    }
+    guard let bookmarksByBook = try? JSONDecoder().decode([String: [WatchBookmark]].self, from: data) else {
+      // SIREN: keep bookmarks that couldn't be read instead of overwriting them
+      UserDefaults.standard.set(data, forKey: bookmarksKey + ".unreadable")
       self.bookmarksByBook = [:]
       return
     }
@@ -40,13 +46,21 @@ final class WatchBookmarkStore {
   }
 
   func add(_ bookmark: WatchBookmark, for bookID: String) {
+    addedAt["\(bookID)|\(bookmark.time)"] = .now
     save(bookmarks(for: bookID) + [bookmark], for: bookID)
   }
 
   func merge(_ synced: [WatchBookmark], keeping inFlightTimes: Set<Int>, for bookID: String) {
     let syncedTimes = Set(synced.map(\.time))
-    let inFlight = bookmarks(for: bookID).filter { inFlightTimes.contains($0.time) && !syncedTimes.contains($0.time) }
-    save(synced + inFlight, for: bookID)
+    // SIREN: a transfer can be delivered before the phone has saved the bookmark, so keep
+    // anything added in the last two minutes too
+    let unconfirmed = bookmarks(for: bookID).filter { bookmark in
+      guard !syncedTimes.contains(bookmark.time) else { return false }
+      let recent = addedAt["\(bookID)|\(bookmark.time)"].map { Date.now.timeIntervalSince($0) < 120 } ?? false
+      return inFlightTimes.contains(bookmark.time) || recent
+    }
+    for time in syncedTimes { addedAt["\(bookID)|\(time)"] = nil }
+    save(synced + unconfirmed, for: bookID)
   }
 
   private func save(_ bookmarks: [WatchBookmark], for bookID: String) {

@@ -25,15 +25,22 @@ final class OIDCAuthenticationManager {
 
     let authURL = try buildOIDCURL()
     let (redirectURL, cookies) = try await makeInitialOAuthRequest(authURL: authURL)
+    // SIREN: the server puts its `state` in the identity provider's URL; the callback must bring
+    // the same one back
+    let expectedState = URLComponents(url: redirectURL, resolvingAgainstBaseURL: false)?
+      .queryItems?.first { $0.name == "state" }?.value
 
     let callbackURL: URL
 
     if #available(iOS 17.4, *) {
+      // SIREN: the redirect usually goes to the identity provider; the server's headers stay with
+      // the server
+      let isServerHost = redirectURL.host()?.lowercased() == URL(string: serverURL)?.host()?.lowercased()
       callbackURL = try await session.authenticate(
         using: redirectURL,
         callback: .customScheme("siren"),  // SIREN: Siren identifiers
         preferredBrowserSession: .shared,
-        additionalHeaderFields: customHeaders
+        additionalHeaderFields: isServerHost ? customHeaders : [:]
       )
     } else {
       callbackURL = try await session.authenticate(
@@ -43,12 +50,17 @@ final class OIDCAuthenticationManager {
       )
     }
 
-    return try await handleAuthenticationResult(callbackURL: callbackURL, cookies: cookies)
+    return try await handleAuthenticationResult(
+      callbackURL: callbackURL,
+      cookies: cookies,
+      expectedState: expectedState
+    )
   }
 
   private func handleAuthenticationResult(
     callbackURL: URL,
-    cookies: [HTTPCookie]
+    cookies: [HTTPCookie],
+    expectedState: String?
   ) async throws -> String {
     AppLogger.authentication.info(
       "Received callback URL: \(callbackURL)"
@@ -61,7 +73,8 @@ final class OIDCAuthenticationManager {
       throw OIDCError.invalidCallback
     }
 
-    let allParams = queryItems.map { "\($0.name): \($0.value ?? "nil")" }.joined(separator: ", ")
+    // SIREN: names only; the values are the authorization code and state
+    let allParams = queryItems.map(\.name).joined(separator: ", ")
     AppLogger.authentication.info("Callback query parameters: \(allParams)")
 
     let code = queryItems.first { $0.name == "code" }?.value
@@ -75,10 +88,13 @@ final class OIDCAuthenticationManager {
       throw OIDCError.authenticationFailed(error)
     }
 
+    if let expectedState, state != expectedState {
+      AppLogger.authentication.error("Callback state doesn't match this sign-in")
+      throw OIDCError.authenticationFailed(String(localized: "The sign-in response didn't match this sign-in."))
+    }
+
     guard let authCode = code else {
-      let availableParams = queryItems.map { "\($0.name): \($0.value ?? "nil")" }.joined(
-        separator: ", "
-      )
+      let availableParams = queryItems.map(\.name).joined(separator: ", ")
       AppLogger.authentication.error(
         "No authorization code in callback. Available params: \(availableParams)"
       )
@@ -86,7 +102,7 @@ final class OIDCAuthenticationManager {
     }
 
     AppLogger.authentication.info(
-      "Calling API loginWithOIDC - code length: \(authCode.count), verifier length: \(self.pkce.verifier.count), state: \(state ?? "nil"), cookies count: \(cookies.count), custom headers count: \(self.customHeaders.count)"
+      "Calling API loginWithOIDC - code length: \(authCode.count), verifier length: \(self.pkce.verifier.count), state present: \(state != nil), cookies count: \(cookies.count), custom headers count: \(self.customHeaders.count)"
     )
 
     let connectionID = try await Audiobookshelf.shared.authentication.loginWithOIDC(

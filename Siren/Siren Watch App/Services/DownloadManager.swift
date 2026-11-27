@@ -1,3 +1,4 @@
+import API
 import Combine
 import Foundation
 import OSLog
@@ -384,8 +385,9 @@ final class DownloadManager: NSObject, ObservableObject {
     }
   }
 
+  // SIREN: the id and extension come from the server; each is kept to one safe name
   private static func relativePath(bookID: String, index: Int, ext: String) -> String {
-    "audiobooks/\(bookID)/\(index)\(ext)"
+    "audiobooks/\(bookID.safePathComponent)/\(index)\(ext.safeFileExtension ?? ".mp3")"
   }
 
   private static func merge(_ newTracks: [WatchTrack], into existing: [WatchTrack], bookID: String) -> [WatchTrack] {
@@ -401,7 +403,7 @@ final class DownloadManager: NSObject, ObservableObject {
 
 extension DownloadManager {
   private func resumeDataURL(bookID: String, index: Int) -> URL {
-    URL.documentsDirectory.appendingPathComponent("audiobooks/\(bookID)/.resume-\(index).dat")
+    URL.documentsDirectory.appendingPathComponent("audiobooks/\(bookID.safePathComponent)/.resume-\(index).dat")
   }
 
   private func loadResumeData(bookID: String, index: Int) -> Data? {
@@ -431,7 +433,8 @@ extension DownloadManager {
     clearRetries(for: bookID)
     updateActiveBookIDs()
 
-    let bookDirectory = URL.documentsDirectory.appendingPathComponent("audiobooks").appendingPathComponent(bookID)
+    let bookDirectory = URL.documentsDirectory.appendingPathComponent("audiobooks")
+      .appendingPathComponent(bookID.safePathComponent)  // SIREN: server id
 
     do {
       if FileManager.default.fileExists(atPath: bookDirectory.path) {
@@ -454,6 +457,12 @@ extension DownloadManager {
   }
 
   func cleanupOrphanedDownloads() {
+    // SIREN: with an unreadable book list every folder would look orphaned
+    guard !localStorage.couldNotRead else {
+      AppLogger.download.error("Book list couldn't be read; leaving downloads in place")
+      return
+    }
+
     let audiobooksDirectory = URL.documentsDirectory.appendingPathComponent("audiobooks")
 
     guard FileManager.default.fileExists(atPath: audiobooksDirectory.path) else {
@@ -467,7 +476,7 @@ extension DownloadManager {
         includingPropertiesForKeys: [.isDirectoryKey]
       )
 
-      let localBookIDs = Set(localStorage.books.map { $0.id })
+      let localBookIDs = Set(localStorage.books.map { $0.id.safePathComponent })  // SIREN: folder names
 
       for directory in downloadDirectories {
         var isDirectory: ObjCBool = false
@@ -522,10 +531,12 @@ extension DownloadManager: URLSessionDownloadDelegate {
         at: destination.deletingLastPathComponent(),
         withIntermediateDirectories: true
       )
+      // SIREN: swap in one step, so a failed move leaves the old file
       if FileManager.default.fileExists(atPath: destination.path) {
-        try FileManager.default.removeItem(at: destination)
+        _ = try FileManager.default.replaceItemAt(destination, withItemAt: location)
+      } else {
+        try FileManager.default.moveItem(at: location, to: destination)
       }
-      try FileManager.default.moveItem(at: location, to: destination)
     } catch {
       AppLogger.download.error("Failed to save track \(info.index) for \(info.bookID): \(error)")
       return

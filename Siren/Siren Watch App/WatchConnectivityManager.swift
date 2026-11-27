@@ -445,6 +445,7 @@ final class WatchConnectivityManager: NSObject, ObservableObject {
       "currentTime": currentTime,
       "timeListened": timeListened,
       "duration": duration,
+      "updatedAt": Date().timeIntervalSince1970,  // SIREN: so the phone can tell which is newer
     ]
 
     session.sendMessage(message, replyHandler: nil) { _ in
@@ -915,7 +916,10 @@ extension WatchConnectivityManager: WCSessionDelegate {
       authentication.removeServer(current.id)
     }
     authentication.restoreConnection(connection)
-    ImagePipeline.shared = .watch(customHeaders: connection.customHeaders)
+    ImagePipeline.shared = .watch(
+      customHeaders: connection.customHeaders,
+      hosts: ServerScopedDataLoader.hosts(of: [connection.serverURL, connection.alternativeURL])
+    )
   }
 
   private func handleMessage(_ message: [String: Any]) {

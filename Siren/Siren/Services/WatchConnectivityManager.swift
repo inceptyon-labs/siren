@@ -571,7 +571,8 @@ extension WatchConnectivityManager: WCSessionDelegate {
             sessionID: sessionID,
             currentTime: currentTime,
             timeListened: timeListened,
-            duration: duration
+            duration: duration,
+            updatedAt: (message["updatedAt"] as? Double).map(Date.init(timeIntervalSince1970:))
           )
         }
       default:
@@ -1058,17 +1059,24 @@ extension WatchConnectivityManager: WCSessionDelegate {
     sessionID: String,
     currentTime: Double,
     timeListened: Double,
-    duration: Double
+    duration: Double,
+    updatedAt: Date?
   ) {
     Task {
       do {
         let safeDuration = max(duration, 1)
-        try? MediaProgress.updateProgress(
-          for: bookID,
-          currentTime: currentTime,
-          duration: safeDuration,
-          progress: min(1, max(0, currentTime / safeDuration))
-        )
+        // SIREN: a report that arrives after newer listening on the phone doesn't move it back
+        let reportedAt = updatedAt ?? Date()
+        let local = try? MediaProgress.fetch(bookID: bookID)
+        if local.map({ reportedAt > $0.lastUpdate }) ?? true {
+          try? MediaProgress.updateProgress(
+            for: bookID,
+            currentTime: currentTime,
+            duration: safeDuration,
+            progress: min(1, max(0, currentTime / safeDuration)),
+            lastUpdate: reportedAt
+          )
+        }
 
         try await Audiobookshelf.shared.sessions.sync(
           sessionID,

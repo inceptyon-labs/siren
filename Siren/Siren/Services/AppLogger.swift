@@ -37,9 +37,11 @@ nonisolated enum AppLogger {
   private static func configureNetworkLogger() {
     NetworkLogger.shared = NetworkLogger { config in
       config.sensitiveHeaders = ["*"]
-      config.sensitiveQueryItems = ["token", "code", "code_verifier"]
+      config.sensitiveQueryItems = ["token", "code", "code_verifier", "state"]  // SIREN: state
       config.sensitiveDataFields = [
         "accessToken",
+        "apiKey",  // SIREN: POST /api/api-keys returns the new key here
+        "key",
         "authOpenIDAuthorizationURL",
         "authOpenIDIssuerURL",
         "authOpenIDJwksURL",

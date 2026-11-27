@@ -44,6 +44,7 @@ final class CarPlayTabBar: NSObject {
       libraries.current?.id,
       libraries.current?.mediaType.rawValue,
       libraries.libraries.map(\.id).joined(separator: ","),
+      SirenProfiles.shared.isKidsActive ? "kids" : nil,  // SIREN
     ]
     .map { $0 ?? "" }
     .joined(separator: "|")
@@ -71,7 +72,8 @@ final class CarPlayTabBar: NSObject {
 
       templates.append(offline.template)
 
-      if Audiobookshelf.shared.libraries.libraries.count > 1 {
+      // SIREN: a kids profile stays in its library
+      if Audiobookshelf.shared.libraries.libraries.count > 1, !SirenProfiles.shared.isKidsActive {
         let librarySelector = CarPlayLibrarySelector()
         tabs[librarySelector.template] = librarySelector
         templates.append(librarySelector.template)

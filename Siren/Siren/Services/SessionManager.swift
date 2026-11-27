@@ -266,12 +266,16 @@ extension SessionManager {
   }
 
   func closeSession(
-    isDownloaded: Bool = false
+    isDownloaded: Bool = false,
+    session closing: PlaybackSession? = nil
   ) async throws {
-    guard let session = current else {
+    // SIREN: a session handed in may no longer be `current` (the player moved on); it still gets
+    // its last listening time sent and its server session closed
+    guard let session = closing ?? current else {
       AppLogger.session.debug("Session already closed or no session to close")
       return
     }
+    let isCurrent = session === current
 
     try session.save()
 
@@ -292,11 +296,17 @@ extension SessionManager {
         AppLogger.session.info(
           "Successfully closed remote session: \(session.id)"
         )
-        UserDefaults.standard.removeObject(forKey: sessionIDKey)
-        UserDefaults.standard.removeObject(forKey: retryCountKey)
-        cancelScheduledSessionClose()
+        if isCurrent {
+          UserDefaults.standard.removeObject(forKey: sessionIDKey)
+          UserDefaults.standard.removeObject(forKey: retryCountKey)
+          cancelScheduledSessionClose()
+        }
       } catch {
         AppLogger.session.error("Failed to close remote session: \(error)")
+
+        // SIREN: not the playing session any more; the server expires it, and any time it still
+        // owes is sent by syncUnsyncedSessions
+        guard isCurrent else { return }
 
         if isDownloaded {
           AppLogger.session.info(
@@ -331,9 +341,9 @@ extension SessionManager {
         scheduleSessionClose(customDelay: backoffDelay)
         throw error
       }
-      current = nil
+      if current === session { current = nil }
     } else {
-      current = nil
+      if current === session { current = nil }
 
       do {
         try await uploadLocalSession(session)
@@ -387,6 +397,29 @@ extension SessionManager {
     session.timeListening += timeListening
     session.pendingListeningTime -= timeListening
     try session.save()
+  }
+
+  /// Sends every session still holding listening time for the active sign-in, now. For logout,
+  /// just before that sign-in's data is deleted.
+  func sendPendingSessions() async {  // SIREN
+    for session in (try? PlaybackSession.fetchUnsynced()) ?? [] where session !== current {
+      if session.isRemote {
+        try? await uploadLeftoverRemoteSession(session)
+      } else {
+        try? await uploadLocalSession(session)
+      }
+    }
+  }
+
+  /// Time a streamed session still owes after the player moved on (stopped offline, recovered, or
+  /// switched books). The server may have closed the session since, so a 404 sends it the way
+  /// downloaded books send theirs.
+  private func uploadLeftoverRemoteSession(_ session: PlaybackSession) async throws {
+    do {
+      try await uploadRemoteProgress(session)
+    } catch NetworkError.httpError(let statusCode, _) where statusCode == 404 {
+      try await uploadLocalSession(session)
+    }
   }
 
   private func uploadLocalSession(_ session: PlaybackSession) async throws {
@@ -462,23 +495,41 @@ extension SessionManager {
     AppLogger.session.info("Syncing \(unsyncedSessions.count) unsynced sessions")
 
     lastUnsyncedSyncAt = .now
+    // SIREN: these sessions belong to this sign-in; a profile switch mid-way stops the run, so
+    // none goes to the other account
+    let serverID = ModelContextProvider.shared.activeServerID
     unsyncedSyncTask = Task {
       defer { unsyncedSyncTask = nil }
 
       var syncedCount = 0
+      var hadServerError = false
       for session in unsyncedSessions {
+        guard ModelContextProvider.shared.activeServerID == serverID else {
+          AppLogger.session.info("Profile switched; leaving the rest of the sessions for later")
+          return
+        }
+        // SIREN: the playing session sends its own time
+        guard session !== current else { continue }
         do {
-          try await uploadLocalSession(session)
+          if session.isRemote {
+            try await uploadLeftoverRemoteSession(session)
+          } else {
+            try await uploadLocalSession(session)
+          }
+          forgetRejections(of: session)
           syncedCount += 1
         } catch {
-          if let networkError = error as? NetworkError,
-            case .httpError(let statusCode, _) = networkError,
-            !([401, 408, 429].contains(statusCode) || statusCode >= 500)
-          {
-            AppLogger.session.warning(
-              "Server rejected session \(session.id) with HTTP \(statusCode), skipping it"
-            )
-            continue
+          if let networkError = error as? NetworkError, case .httpError(let statusCode, _) = networkError {
+            // SIREN: one session the server can't take doesn't hold up the others
+            if statusCode >= 500 {
+              hadServerError = true
+              AppLogger.session.error("Server error \(statusCode) for session \(session.id); trying the rest")
+              continue
+            }
+            if ![401, 408, 429].contains(statusCode) {
+              recordRejection(of: session, statusCode: statusCode)
+              continue
+            }
           }
 
           unsyncedSyncDelay = max(60, min(unsyncedSyncDelay * 2, 16 * 60))
@@ -489,9 +540,43 @@ extension SessionManager {
         }
       }
 
-      unsyncedSyncDelay = 30
+      if hadServerError {
+        unsyncedSyncDelay = max(60, min(unsyncedSyncDelay * 2, 16 * 60))
+      } else {
+        unsyncedSyncDelay = 30
+      }
       AppLogger.session.info("Successfully synced \(syncedCount) sessions")
     }
+  }
+
+  // SIREN: a session the server keeps refusing is given up after a few tries instead of being
+  // retried on every launch
+  private static let rejectionsKey = "siren.sessionRejections"
+  private static let maxRejections = 3
+
+  private func recordRejection(of session: PlaybackSession, statusCode: Int) {
+    var rejections = UserDefaults.standard.dictionary(forKey: Self.rejectionsKey) as? [String: Int] ?? [:]
+    let count = (rejections[session.id] ?? 0) + 1
+    if count >= Self.maxRejections {
+      AppLogger.session.warning(
+        "Server rejected session \(session.id) \(count) times (HTTP \(statusCode)); giving it up"
+      )
+      session.pendingListeningTime = 0
+      try? session.save()
+      rejections[session.id] = nil
+    } else {
+      AppLogger.session.warning("Server rejected session \(session.id) with HTTP \(statusCode), will retry")
+      rejections[session.id] = count
+    }
+    UserDefaults.standard.set(rejections, forKey: Self.rejectionsKey)
+  }
+
+  private func forgetRejections(of session: PlaybackSession) {
+    guard var rejections = UserDefaults.standard.dictionary(forKey: Self.rejectionsKey) as? [String: Int],
+      rejections[session.id] != nil
+    else { return }
+    rejections[session.id] = nil
+    UserDefaults.standard.set(rejections, forKey: Self.rejectionsKey)
   }
 }
 

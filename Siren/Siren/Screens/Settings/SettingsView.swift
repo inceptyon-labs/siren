@@ -164,6 +164,7 @@ struct SettingsView: View {
         }
       }
     }
+    .sirenGrownUpsOnly()  // SIREN: kids profile
   }
 
   private var storageSubtitle: Text {

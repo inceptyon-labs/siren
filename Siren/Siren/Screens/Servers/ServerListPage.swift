@@ -31,7 +31,10 @@ struct ServerListPage: View {
           } else {
             ForEach(model.servers, id: \.id) { server in
               Button {
-                model.selected = server
+                // SIREN: another profile's sign-in needs its Face ID when it asks for one
+                Task {
+                  if await SirenProfiles.shared.mayOpen(server.profileID) { model.selected = server }
+                }
               } label: {
                 HStack {
                   Text(verbatim: "●")
@@ -88,6 +91,7 @@ struct ServerListPage: View {
       }
       .onAppear(perform: model.onAppear)
     }
+    .sirenGrownUpsOnly()  // SIREN: kids profile
   }
 }
 
